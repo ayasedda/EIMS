@@ -48,6 +48,9 @@ test_*.py
 eims_export.sql
 export_db.py
 
+# Desktop mode flag (local only, must NOT be on Streamlit Cloud)
+desktop.flag
+
 # Claude Code local settings
 .claude/
 

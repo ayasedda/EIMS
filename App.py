@@ -15,6 +15,9 @@ import plotly.express as px
 from database_mysql import Database
 from data_manager import DataManager
 
+# desktop.flag file → desktop app; absent → web/cloud (clients only)
+IS_DESKTOP = os.path.exists(os.path.join(os.path.dirname(__file__), "desktop.flag"))
+
 # Configure logging to console only (no file I/O on cloud)
 logging.basicConfig(
     level=logging.WARNING,
@@ -3534,7 +3537,7 @@ if page_matches(page, 'login'):
                         if hash_val == user['password_hash']:
                             # ...existing code...
                             user_role = user.get('role', 'employee')
-                            if user_role != 'client':
+                            if user_role != 'client' and not IS_DESKTOP:
                                 st.error("⛔ This portal is for clients only. Employees and managers must use the desktop application.")
                                 st.stop()
                             # جلب القسم من جدول company_records
@@ -3655,8 +3658,8 @@ The manager will:
         _safe_rerun()
 
 elif page_matches(page, 'signup'):
-    # Web portal: only client signup allowed
-    if 'signup_type' not in st.session_state:
+    # Web portal: skip account type selection, go straight to client form
+    if 'signup_type' not in st.session_state and not IS_DESKTOP:
         st.session_state['signup_type'] = 'client'
         _safe_rerun()
     if False:  # disabled: account type selection
