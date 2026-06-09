@@ -3534,6 +3534,9 @@ if page_matches(page, 'login'):
                         if hash_val == user['password_hash']:
                             # ...existing code...
                             user_role = user.get('role', 'employee')
+                            if user_role != 'client':
+                                st.error("⛔ This portal is for clients only. Employees and managers must use the desktop application.")
+                                st.stop()
                             # جلب القسم من جدول company_records
                             department = None
                             try:
