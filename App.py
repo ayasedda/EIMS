@@ -2566,10 +2566,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Remove caching to ensure fresh data
+@st.cache_resource(show_spinner=False)
 def init_database():
     return Database()
 
+@st.cache_resource(show_spinner=False)
 def init_data_manager():
     return DataManager()
 
