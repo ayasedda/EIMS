@@ -5336,18 +5336,17 @@ elif page_matches(page, 'manage_shipments'):
                                 if not IS_DESKTOP:
                                     st.info("📎 Document upload is only available in the desktop application.")
                                 else:
-                                  try:
-                                    os.makedirs("shipment_documents", exist_ok=True)
-                                    file_path = os.path.join("shipment_documents",
-                                                            f"{ship_data['shipment_number']}_{uploaded_file.name}")
-                                    with open(file_path, "wb") as f:
-                                        f.write(uploaded_file.getbuffer())
-
-                                    db.add_shipment_document(int(ship_data['id']), doc_type, file_path, user['id'], doc_notes)
-                                    st.success(t('document_uploaded'))
-                                    _safe_rerun()
-                                except Exception as e:
-                                    st.error(f"Error: {str(e)}")
+                                    try:
+                                        os.makedirs("shipment_documents", exist_ok=True)
+                                        file_path = os.path.join("shipment_documents",
+                                                                f"{ship_data['shipment_number']}_{uploaded_file.name}")
+                                        with open(file_path, "wb") as f:
+                                            f.write(uploaded_file.getbuffer())
+                                        db.add_shipment_document(int(ship_data['id']), doc_type, file_path, user['id'], doc_notes)
+                                        st.success(t('document_uploaded'))
+                                        _safe_rerun()
+                                    except Exception as e:
+                                        st.error(f"Error: {str(e)}")
                             else:
                                 st.error(t('please_select_file'))
     except Exception as e:
