@@ -3147,6 +3147,40 @@ def _ensure_manager_once():
 
 _ensure_manager_once()
 
+import json as _json
+
+@st.cache_data(ttl=45, show_spinner=False, max_entries=300)
+def _qcache(query: str, params_json: str = "{}") -> "pd.DataFrame":
+    _p = _json.loads(params_json) if params_json != "{}" else None
+    return db.fetch_dataframe(query, _p)
+
+def _q(query: str, params: dict = None) -> "pd.DataFrame":
+    return _qcache(query, _json.dumps(params or {}, default=str))
+
+@st.cache_data(ttl=45, show_spinner=False, max_entries=100)
+def _get_shipments_by_client(client_id):
+    return db.get_shipments_by_client(client_id)
+
+@st.cache_data(ttl=45, show_spinner=False, max_entries=100)
+def _get_cargo_by_shipment(shipment_id):
+    return db.get_cargo_items_by_shipment(shipment_id)
+
+@st.cache_data(ttl=45, show_spinner=False, max_entries=100)
+def _get_cargo_requests_by_client(client_id):
+    return db.get_cargo_requests_by_client(client_id)
+
+@st.cache_data(ttl=30, show_spinner=False, max_entries=50)
+def _get_user_messages(user_id):
+    return db.get_user_messages(user_id)
+
+@st.cache_data(ttl=60, show_spinner=False, max_entries=50)
+def _get_invoices(status_filter=None):
+    return db.get_invoices(status_filter)
+
+@st.cache_data(ttl=60, show_spinner=False, max_entries=50)
+def _get_leave_requests(user_id):
+    return db.get_leave_requests_by_user(user_id)
+
 def _safe_rerun():
     """Rerun the Streamlit script."""
     st.rerun()
@@ -5450,19 +5484,19 @@ elif page_matches(page, 'client_dashboard'):
     user = st.session_state.get('user') or {}
     _cid   = user.get('id')
     _cemail= user.get('email','')
-    _cname_row = db.fetch_dataframe("SELECT full_name FROM users WHERE id=:uid", {"uid": _cid})
+    _cname_row = _q("SELECT full_name FROM users WHERE id=:uid", {"uid": _cid})
     _cname = str(_cname_row.iloc[0]["full_name"]) if (_cname_row is not None and not _cname_row.empty and _cname_row.iloc[0]["full_name"]) else _cemail
 
     st.markdown(f"## 👋 {t('welcome_back')}, **{_cname}**")
     st.markdown("---")
 
     # ── Metric cards ──────────────────────────────────────────────────────────
-    _shp_df  = db.fetch_dataframe("SELECT status FROM shipments WHERE client_id=:ci", {"ci": _cid})
-    _tkt_df  = db.fetch_dataframe("SELECT status FROM cs_tickets WHERE client_id=:ci", {"ci": _cid})
-    _inv_df  = db.fetch_dataframe("SELECT status FROM finance_invoices WHERE client_email=:ce", {"ce": _cemail})
-    _off_df  = db.fetch_dataframe("SELECT status FROM sales_offers WHERE client_email=:ce AND status='Sent'", {"ce": _cemail})
-    _unread_msgs = db.count_unread_messages(_cid) if _cid else 0
-    _unread_tkts = sum(db.get_all_unread_counts('client', _cid).values()) if _cid else 0
+    _shp_df  = _q("SELECT status FROM shipments WHERE client_id=:ci", {"ci": _cid})
+    _tkt_df  = _q("SELECT status FROM cs_tickets WHERE client_id=:ci", {"ci": _cid})
+    _inv_df  = _q("SELECT status FROM finance_invoices WHERE client_email=:ce", {"ce": _cemail})
+    _off_df  = _q("SELECT status FROM sales_offers WHERE client_email=:ce AND status='Sent'", {"ce": _cemail})
+    _unread_msgs = get_cached_unread_messages(_cid) if _cid else 0
+    _unread_tkts = get_cached_unread_tickets('client', _cid) if _cid else 0
 
     _active_shp  = int((_shp_df['status'].isin(['Pending','In Transit','At Customs'])).sum()) if not _shp_df.empty else 0
     _open_tkt    = int((_tkt_df['status'].isin(['Open','In Progress'])).sum()) if not _tkt_df.empty else 0
@@ -5484,7 +5518,7 @@ elif page_matches(page, 'client_dashboard'):
 
     # ── Recent Shipments ──────────────────────────────────────────────────────
     st.subheader(f"🚢 {t('recent_shipments')}")
-    _rshp = db.fetch_dataframe(
+    _rshp = _q(
         "SELECT shipment_number, status, origin, destination, expected_arrival "
         "FROM shipments WHERE client_id=:ci ORDER BY id DESC LIMIT 5", {"ci": _cid}
     )
@@ -5504,7 +5538,7 @@ elif page_matches(page, 'client_dashboard'):
 
     # ── Recent Tickets ────────────────────────────────────────────────────────
     st.subheader(f"🎫 {t('recent_tickets')}")
-    _rtkt = db.fetch_dataframe(
+    _rtkt = _q(
         "SELECT ticket_number, subject, status, priority FROM cs_tickets "
         "WHERE client_id=:ci ORDER BY created_at DESC LIMIT 4", {"ci": _cid}
     )
@@ -5522,7 +5556,7 @@ elif page_matches(page, 'client_dashboard'):
 
     # ── Recent Offers ─────────────────────────────────────────────────────────
     st.subheader(f"📋 {t('recent_offers')}")
-    _roff = db.fetch_dataframe(
+    _roff = _q(
         "SELECT offer_number, freight_type, origin, destination, total_value, status "
         "FROM sales_offers WHERE client_email=:ce ORDER BY created_at DESC LIMIT 4", {"ce": _cemail}
     )
@@ -5546,7 +5580,7 @@ elif page_matches(page, 'my_shipments'):
         st.stop()
 
     try:
-        df = db.get_shipments_by_client(user['id'])
+        df = _get_shipments_by_client(user['id'])
         if df.empty:
             st.info(t('no_shipments_client'))
         else:
@@ -5557,11 +5591,11 @@ elif page_matches(page, 'my_shipments'):
             _shp_status_f = _sf2.selectbox(t('status'), _shp_statuses, key="shp_status_f", format_func=_topt, label_visibility="collapsed")
             _df_filtered = df.copy()
             if _shp_search:
-                _q = _shp_search.lower()
+                _sq = _shp_search.lower()
                 _mask = (
-                    _df_filtered["shipment_number"].str.lower().str.contains(_q, na=False) |
-                    _df_filtered["origin_country"].str.lower().str.contains(_q, na=False) |
-                    _df_filtered["destination_country"].str.lower().str.contains(_q, na=False)
+                    _df_filtered["shipment_number"].str.lower().str.contains(_sq, na=False) |
+                    _df_filtered["origin_country"].str.lower().str.contains(_sq, na=False) |
+                    _df_filtered["destination_country"].str.lower().str.contains(_sq, na=False)
                 )
                 _df_filtered = _df_filtered[_mask]
             if _shp_status_f != "All":
@@ -5593,18 +5627,18 @@ elif page_matches(page, 'my_shipments'):
             st.markdown("---")
             st.subheader(t('cargo_items'))
             try:
-                cargo_df = db.get_cargo_items_by_shipment(int(ship_data['id']))
+                cargo_df = _get_cargo_by_shipment(int(ship_data['id']))
                 if not cargo_df.empty:
                     st.dataframe(cargo_df[['item_name', 'quantity', 'unit', 'weight', 'value']], width='stretch')
                 else:
                     st.info(t('no_cargo_listed'))
             except Exception as _ce:
                 st.warning(f"Could not load cargo items: {_ce}")
-            
+
             # Show tracking
             st.markdown("---")
             st.subheader(t('tracking'))
-            tracking_df = db.get_tracking_updates(int(ship_data['id']))
+            tracking_df = _q("SELECT update_text, status, created_at FROM tracking_updates WHERE shipment_id=:sid ORDER BY created_at DESC", {"sid": int(ship_data['id'])})
             if not tracking_df.empty:
                 for _, row in tracking_df.iterrows():
                     st.markdown(f"""
