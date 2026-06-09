@@ -4,15 +4,8 @@ import streamlit as st
 import os
 import logging
 
-# lightweight DB logger (does not log secrets)
 logger = logging.getLogger("eims_db")
-if not logger.handlers:
-    h = logging.FileHandler("eims_db.log")
-    h.setLevel(logging.INFO)
-    fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-    h.setFormatter(fmt)
-    logger.addHandler(h)
-    logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 
 

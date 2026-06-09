@@ -3136,13 +3136,7 @@ try:
         gen_hash = _hash_password(gen_password, gen_salt)
         created = db.create_user(_admin_email, gen_hash, gen_salt, role='manager')
         if created:
-            cred_path = 'manager_credentials.txt'
-            try:
-                with open(cred_path, 'w', encoding='utf-8') as f:
-                    f.write(f'email: {_admin_email}\npassword: {gen_password}\n')
-                print(f"Created manager {_admin_email} and wrote credentials to {cred_path}")
-            except Exception as e:
-                print(f"Created manager {_admin_email} but failed to write credentials: {e}")
+            print(f"Created manager {_admin_email} | password: {gen_password}")
 except Exception as _e:
     print(f"Error ensuring manager user: {_e}")
 
@@ -3183,24 +3177,6 @@ try:
 except Exception:
     pass
 
-# Fallback: if a helper file was written by the assistant/script, show it once and remove it
-try:
-    import json, os
-    if not ('last_shipment_created' in st.session_state) and os.path.exists('last_shipment_created.json'):
-        try:
-            with open('last_shipment_created.json','r',encoding='utf-8') as f:
-                info = json.load(f)
-            if info:
-                st.success(f"✅ Shipment {info.get('number','')} created successfully — ID: {info.get('id')}")
-                st.info(f"Shipment Number: {info.get('number','')}")
-        except Exception:
-            pass
-        try:
-            os.remove('last_shipment_created.json')
-        except Exception:
-            pass
-except Exception:
-    pass
 
 PAGES = {
     'login': 'Login',
@@ -4575,18 +4551,21 @@ elif page_matches(page, 'request_leave'):
                     st.error(t('date_range_err'))
                 else:
                     try:
-                        # handle optional attachment save
+                        # handle optional attachment save (desktop only)
                         attachment_name = ''
                         if attachment_file is not None:
-                            try:
-                                os.makedirs('uploads', exist_ok=True)
-                                safe_name = f"user{user['id']}_{int(time.time())}_{attachment_file.name}"
-                                save_path = os.path.join('uploads', safe_name)
-                                with open(save_path, 'wb') as out:
-                                    out.write(attachment_file.getbuffer())
-                                attachment_name = safe_name
-                            except Exception as e:
-                                st.warning(f"Could not save attachment: {e}")
+                            if not IS_DESKTOP:
+                                st.info("📎 File attachments are only available in the desktop application.")
+                            else:
+                                try:
+                                    os.makedirs('uploads', exist_ok=True)
+                                    safe_name = f"user{user['id']}_{int(time.time())}_{attachment_file.name}"
+                                    save_path = os.path.join('uploads', safe_name)
+                                    with open(save_path, 'wb') as out:
+                                        out.write(attachment_file.getbuffer())
+                                    attachment_name = safe_name
+                                except Exception as e:
+                                    st.warning(f"Could not save attachment: {e}")
 
                         db.create_leave_request(user['id'], str(start_date), str(end_date), reason, leave_type, attachment_name, priority)
                         db.insert_activity_log("leave_request", f"Submitted leave: {start_date} → {end_date} | {leave_type} | Priority: {priority}", user.get('email',''))
@@ -5354,14 +5333,16 @@ elif page_matches(page, 'manage_shipments'):
                         
                         if st.form_submit_button("Upload"):
                             if uploaded_file:
-                                try:
-                                    # Save file
+                                if not IS_DESKTOP:
+                                    st.info("📎 Document upload is only available in the desktop application.")
+                                else:
+                                  try:
                                     os.makedirs("shipment_documents", exist_ok=True)
-                                    file_path = os.path.join("shipment_documents", 
+                                    file_path = os.path.join("shipment_documents",
                                                             f"{ship_data['shipment_number']}_{uploaded_file.name}")
                                     with open(file_path, "wb") as f:
                                         f.write(uploaded_file.getbuffer())
-                                    
+
                                     db.add_shipment_document(int(ship_data['id']), doc_type, file_path, user['id'], doc_notes)
                                     st.success(t('document_uploaded'))
                                     _safe_rerun()
@@ -9264,35 +9245,38 @@ elif page_matches(page, 'profile'):
                 # ── Upload / change avatar ────────────────────────────────────
                 if _can_edit_avatar:
                     with st.expander(t('change_profile_pic')):
-                        _up_col, _del_col = st.columns([3, 1])
-                        with _up_col:
-                            _avatar_file = st.file_uploader(t('upload_photo'), type=['jpg', 'jpeg', 'png'], key='avatar_upload')
-                            if _avatar_file is not None:
-                                if _avatar_file.size > 2 * 1024 * 1024:
-                                    st.error(t('file_too_large'))
-                                else:
-                                    if st.button(t('save_photo')):
+                        if not IS_DESKTOP:
+                            st.info("🖼️ Profile picture upload is only available in the desktop application.")
+                        else:
+                            _up_col, _del_col = st.columns([3, 1])
+                            with _up_col:
+                                _avatar_file = st.file_uploader(t('upload_photo'), type=['jpg', 'jpeg', 'png'], key='avatar_upload')
+                                if _avatar_file is not None:
+                                    if _avatar_file.size > 2 * 1024 * 1024:
+                                        st.error(t('file_too_large'))
+                                    else:
+                                        if st.button(t('save_photo')):
+                                            try:
+                                                _av_dir = os.path.join('uploads', 'avatars')
+                                                os.makedirs(_av_dir, exist_ok=True)
+                                                _ext = _avatar_file.name.rsplit('.', 1)[-1].lower()
+                                                _av_name = f"avatar_{selected.get('id')}.{_ext}"
+                                                _av_path = os.path.join(_av_dir, _av_name)
+                                                with open(_av_path, 'wb') as _f:
+                                                    _f.write(_avatar_file.getbuffer())
+                                                db.update_user_avatar(selected.get('id'), _av_path)
+                                                db.insert_activity_log("avatar_update", "Updated profile picture", current_user.get('email',''))
+                                                st.success(t('profile_pic_updated'))
+                                                _safe_rerun()
+                                            except Exception as _e:
+                                                st.error(f"Failed to save: {_e}")
+                            with _del_col:
+                                if _avatar_path and os.path.exists(_avatar_path):
+                                    if st.button(t('remove_photo')):
                                         try:
-                                            _av_dir = os.path.join('uploads', 'avatars')
-                                            os.makedirs(_av_dir, exist_ok=True)
-                                            _ext = _avatar_file.name.rsplit('.', 1)[-1].lower()
-                                            _av_name = f"avatar_{selected.get('id')}.{_ext}"
-                                            _av_path = os.path.join(_av_dir, _av_name)
-                                            with open(_av_path, 'wb') as _f:
-                                                _f.write(_avatar_file.getbuffer())
-                                            db.update_user_avatar(selected.get('id'), _av_path)
-                                            db.insert_activity_log("avatar_update", "Updated profile picture", current_user.get('email',''))
-                                            st.success(t('profile_pic_updated'))
-                                            _safe_rerun()
-                                        except Exception as _e:
-                                            st.error(f"Failed to save: {_e}")
-                        with _del_col:
-                            if _avatar_path and os.path.exists(_avatar_path):
-                                if st.button(t('remove_photo')):
-                                    try:
-                                        os.remove(_avatar_path)
-                                    except Exception:
-                                        pass
+                                            os.remove(_avatar_path)
+                                        except Exception:
+                                            pass
                                     db.update_user_avatar(selected.get('id'), '')
                                     st.success(t('photo_removed'))
                                     _safe_rerun()
