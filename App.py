@@ -15,18 +15,19 @@ import plotly.express as px
 from database_mysql import Database
 from data_manager import DataManager
 
-# Configure logging
+# Configure logging to console only (no file I/O on cloud)
 logging.basicConfig(
-    filename='eims_app.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.WARNING,
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Configure page with performance optimizations
+# Configure page
+_logo_path = "assets/logo.png"
+_page_icon = Image.open(_logo_path) if os.path.exists(_logo_path) else "📊"
 st.set_page_config(
     page_title="EIMS",
-    page_icon="📊",
+    page_icon=_page_icon,
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -2552,19 +2553,6 @@ TRANSLATIONS = {
     }
 }
 
-# Configure page icon
-logo_icon = "assets/logo.png"
-if os.path.exists(logo_icon):
-    page_icon = Image.open(logo_icon)
-else:
-    page_icon = ""
-
-st.set_page_config(
-    page_title="EIMS",
-    page_icon=page_icon,
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 @st.cache_resource(show_spinner=False)
 def init_database():
