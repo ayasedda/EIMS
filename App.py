@@ -3121,24 +3121,31 @@ def get_db_connection():
     """Cache database connection"""
     return Database()
 
-# Ensure specific manager email exists and has manager role
-try:
-    _admin_email = 'aya@gmail.com'
-    existing = db.get_user_by_email(_admin_email)
-    if existing:
-        if existing.get('role') != 'manager':
+@st.cache_data(ttl=30, show_spinner=False, max_entries=50)
+def get_cached_unread_messages(user_id):
+    try:
+        return db.count_unread_messages(user_id)
+    except Exception:
+        return 0
+
+@st.cache_data(ttl=30, show_spinner=False, max_entries=50)
+def get_cached_unread_tickets(role, user_id=None):
+    try:
+        return sum(db.get_all_unread_counts(role, user_id).values())
+    except Exception:
+        return 0
+
+@st.cache_resource(show_spinner=False)
+def _ensure_manager_once():
+    try:
+        _admin_email = 'aya@manager.com'
+        existing = db.get_user_by_email(_admin_email)
+        if existing and existing.get('role') != 'manager':
             db.update_user_role(existing['id'], 'manager')
-            print(f"Promoted {_admin_email} to manager")
-    else:
-        # create manager user with a generated password and save credentials to a file
-        gen_salt = _generate_salt()
-        gen_password = secrets.token_urlsafe(10)
-        gen_hash = _hash_password(gen_password, gen_salt)
-        created = db.create_user(_admin_email, gen_hash, gen_salt, role='manager')
-        if created:
-            print(f"Created manager {_admin_email} | password: {gen_password}")
-except Exception as _e:
-    print(f"Error ensuring manager user: {_e}")
+    except Exception as _e:
+        print(f"Manager check error: {_e}")
+
+_ensure_manager_once()
 
 def _safe_rerun():
     """Rerun the Streamlit script in a way compatible with multiple Streamlit versions."""
@@ -3316,15 +3323,15 @@ with st.sidebar:
         _nav_role = _nav_user.get('role')
         _nav_dept = _nav_user.get('department')
         if _nav_uid:
-            _unread_msgs = db.count_unread_messages(_nav_uid)
+            _unread_msgs = get_cached_unread_messages(_nav_uid)
             _msg_lbl     = t('messages')
             _unread_tkts = 0
 
             if _nav_role == 'client':
-                _unread_tkts = sum(db.get_all_unread_counts('client', _nav_uid).values())
+                _unread_tkts = get_cached_unread_tickets('client', _nav_uid)
                 _tkt_lbl     = t('my_tickets')
             elif _nav_dept == 'Customer Service':
-                _unread_tkts = sum(db.get_all_unread_counts('cs').values())
+                _unread_tkts = get_cached_unread_tickets('cs')
                 _tkt_lbl     = t('client_tickets')
             else:
                 _tkt_lbl = None
