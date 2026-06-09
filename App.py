@@ -3148,21 +3148,8 @@ def _ensure_manager_once():
 _ensure_manager_once()
 
 def _safe_rerun():
-    """Rerun the Streamlit script in a way compatible with multiple Streamlit versions."""
-    # Clear cache before rerun for fresh data
-    try:
-        get_cached_records.clear()
-        get_cached_shipments.clear()
-        get_cached_users.clear()
-    except:
-        pass
-    if hasattr(st, "rerun"):
-        st.rerun()
-    elif hasattr(st, "experimental_rerun"):
-        st.rerun()
-    else:
-        st.query_params = {"_rerun": int(time.time())}
-        st.stop()
+    """Rerun the Streamlit script."""
+    st.rerun()
 
 
 # Show one-time success notifications stored in session state
