@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Uploads
+uploads/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Test files
+test_*.py
+*_test.py
+
+# Export/seed scripts (local only)
+eims_export.sql
+export_db.py
+
+# Claude Code local settings
+.claude/
+
+# Uploaded documents (not part of source code)
+shipment_documents/
+
+# Credentials (plaintext files)
+*_credentials.txt
+password_resets.txt
+admin_credentials.txt
+manager_credentials.txt
+
+# Streamlit secrets (keep config but not secrets)
+.streamlit/secrets.toml
