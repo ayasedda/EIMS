@@ -3655,8 +3655,11 @@ The manager will:
         _safe_rerun()
 
 elif page_matches(page, 'signup'):
-    # Check if user has selected account type
+    # Web portal: only client signup allowed
     if 'signup_type' not in st.session_state:
+        st.session_state['signup_type'] = 'client'
+        _safe_rerun()
+    if False:  # disabled: account type selection
         # Show account type selection page
         st.markdown("<h1 style='text-align: center; color: #1E88E5; margin-bottom: 10px;'> Create New Account</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; color: #888; font-size: 18px; margin-bottom: 40px;'>Choose the type of account you want to register</p>", unsafe_allow_html=True)
