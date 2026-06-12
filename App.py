@@ -5651,14 +5651,14 @@ elif page_matches(page, 'my_shipments'):
             # Show tracking
             st.markdown("---")
             st.subheader(t('tracking'))
-            tracking_df = _q("SELECT update_text, status, created_at FROM tracking_updates WHERE shipment_id=:sid ORDER BY created_at DESC", {"sid": int(ship_data['id'])})
+            tracking_df = _q("SELECT location, status, notes, created_at FROM tracking_updates WHERE shipment_id=:sid ORDER BY created_at DESC", {"sid": int(ship_data['id'])})
             if not tracking_df.empty:
                 for _, row in tracking_df.iterrows():
                     st.markdown(f"""
                     <div class='card'>
-                        <strong>{row['update_date']}</strong> - {row['location']}<br>
-                        <span class='status-badge status-{row['status'].lower().replace(' ', '-')}'>{row['status']}</span><br>
-                        {row['notes'] if row['notes'] else ''}
+                        <strong>{str(row['created_at'])[:16]}</strong> - {row.get('location','')}<br>
+                        <span class='status-badge status-{str(row['status']).lower().replace(' ', '-')}'>{row['status']}</span><br>
+                        {row['notes'] if row.get('notes') else ''}
                     </div>
                     """, unsafe_allow_html=True)
             else:
