@@ -50,6 +50,23 @@ def init_data_manager():
 db = init_database()
 data_manager = init_data_manager()
 
+# ── Auto-cache ALL SELECT queries ──────────────────────────────────────────────
+import json as _jc
+
+@st.cache_data(ttl=60, show_spinner=False, max_entries=500)
+def _acf(query_str: str, params_json: str) -> "pd.DataFrame":
+    _p = _jc.loads(params_json) if params_json != "{}" else None
+    return db.fetch_dataframe(query_str, _p)
+
+_orig_fetch = db.fetch_dataframe
+def _patched_fetch(query, params=None):
+    q = str(query).strip()
+    if q.upper().lstrip().startswith("SELECT"):
+        return _acf(q, _jc.dumps(params or {}, default=str))
+    return _orig_fetch(query, params)
+db.fetch_dataframe = _patched_fetch
+# ───────────────────────────────────────────────────────────────────────────────
+
 # Initialize language in session state (only if not already set)
 if 'language' not in st.session_state:
     st.session_state['language'] = 'en'
