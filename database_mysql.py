@@ -219,14 +219,13 @@ class Database:
         try:
             sql = text('''
                 INSERT INTO it_performance_monitoring
-                    (cpu, ram, io, network, disk, network_sent, network_recv, response_time, timestamp)
+                    (cpu, ram, disk, network_sent, network_recv, response_time, timestamp)
                 VALUES
-                    (:cpu, :ram, 0, :network, :disk, :network_sent, :network_recv, :response_time, NOW())
+                    (:cpu, :ram, :disk, :network_sent, :network_recv, :response_time, NOW())
             ''')
             with self.get_connection() as conn:
                 conn.execute(sql, {
                     'cpu': cpu, 'ram': ram, 'disk': disk,
-                    'network': network_recv,
                     'network_sent': network_sent, 'network_recv': network_recv,
                     'response_time': response_time
                 })
@@ -1891,8 +1890,8 @@ class Database:
         try:
             with self.get_connection() as conn:
                 conn.execute(text("""
-                    INSERT INTO tracking_updates (shipment_id,location,status,notes,update_date,created_by,user_id)
-                    VALUES (:sid,:loc,:st,:notes,CURDATE(),:cb,:cb)
+                    INSERT INTO tracking_updates (shipment_id,location,status,notes,updated_by)
+                    VALUES (:sid,:loc,:st,:notes,:cb)
                 """), dict(sid=shipment_id,loc=location,st=status,notes=notes,cb=created_by))
                 conn.execute(text("UPDATE shipments SET status=:s WHERE id=:id"),
                              {"s": status, "id": shipment_id})
@@ -1905,7 +1904,7 @@ class Database:
     def get_tracking_history(self, shipment_id):
         try:
             return self.fetch_dataframe(
-                text("SELECT location,status,notes,update_date FROM tracking_updates WHERE shipment_id=:sid ORDER BY created_at ASC"),
+                text("SELECT location,status,notes,created_at FROM tracking_updates WHERE shipment_id=:sid ORDER BY created_at ASC"),
                 {"sid": shipment_id}
             )
         except Exception:

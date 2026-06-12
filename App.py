@@ -4233,7 +4233,10 @@ elif page_matches(page, 'add'):
                             status=status,
                             password=''  # Empty - authentication via users table only
                         )
-                        db.insert_activity_log("add_record", f"Added record: {employee_name} | Dept: {department or 'N/A'}", st.session_state.get('user',{}).get('email',''))
+                        try:
+                            db.insert_activity_log("add_record", f"Added record: {employee_name} | Dept: {department or 'N/A'}", st.session_state.get('user',{}).get('email',''))
+                        except Exception:
+                            pass
                         
                         # Create user account if requested
                         if create_account:
@@ -4373,7 +4376,10 @@ elif page_matches(page, 'edit'):
                                     password=password
                                 )
                                 if ok:
-                                    db.insert_activity_log("edit_record", f"Updated record: {employee_name} (ID:{record_id})", st.session_state.get('user',{}).get('email',''))
+                                    try:
+                                        db.insert_activity_log("edit_record", f"Updated record: {employee_name} (ID:{record_id})", st.session_state.get('user',{}).get('email',''))
+                                    except Exception:
+                                        pass
                                     # Immediate feedback before rerun
                                     st.success(f"✅ Record '{employee_name}' updated successfully!")
                                     try:
@@ -4609,7 +4615,10 @@ elif page_matches(page, 'request_leave'):
                                     st.warning(f"Could not save attachment: {e}")
 
                         db.create_leave_request(user['id'], str(start_date), str(end_date), reason, leave_type, attachment_name, priority)
-                        db.insert_activity_log("leave_request", f"Submitted leave: {start_date} → {end_date} | {leave_type} | Priority: {priority}", user.get('email',''))
+                        try:
+                            db.insert_activity_log("leave_request", f"Submitted leave: {start_date} → {end_date} | {leave_type} | Priority: {priority}", user.get('email',''))
+                        except Exception:
+                            pass
                         st.success(t('leave_submitted'))
                         _safe_rerun()
                     except Exception as e:
@@ -4812,7 +4821,10 @@ elif page_matches(page, 'manage_users'):
                             if existing_user:
                                 ok = db.update_user_role(existing_user['id'], new_role)
                                 if ok:
-                                    db.insert_activity_log("role_update", f"Changed role of {selected_user} → {new_role}", st.session_state.get('user',{}).get('email',''))
+                                    try:
+                                        db.insert_activity_log("role_update", f"Changed role of {selected_user} → {new_role}", st.session_state.get('user',{}).get('email',''))
+                                    except Exception:
+                                        pass
                                     st.success(t('user_role_updated'))
                                     _safe_rerun()
                                 else:
@@ -5968,7 +5980,10 @@ elif page_matches(page, 'my_tickets'):
                             ok_c = db.create_cs_ticket(tn_c, client_name, client_email, client_id,
                                                        category_c, subject_c, desc_c, "High", None)
                             if ok_c:
-                                db.insert_activity_log("Ticket Created", f"Client ticket {tn_c} submitted", client_email)
+                                try:
+                                    db.insert_activity_log("Ticket Created", f"Client ticket {tn_c} submitted", client_email)
+                                except Exception:
+                                    pass
                                 st.success(t('ticket_submitted'))
                                 st.rerun()
                             else:
@@ -6003,7 +6018,10 @@ elif page_matches(page, 'my_tickets'):
                             ok_c  = db.create_cs_ticket(tn_c, client_name, client_email, client_id,
                                                         category_c, subject_c, desc_c, "Medium", sr_c)
                             if ok_c:
-                                db.insert_activity_log("Ticket Created", f"Client ticket {tn_c} submitted", client_email)
+                                try:
+                                    db.insert_activity_log("Ticket Created", f"Client ticket {tn_c} submitted", client_email)
+                                except Exception:
+                                    pass
                                 st.success(t('ticket_submitted'))
                                 st.rerun()
                             else:
@@ -6023,7 +6041,10 @@ elif page_matches(page, 'my_tickets'):
                             ok_c = db.create_cs_ticket(tn_c, client_name, client_email, client_id,
                                                        category_c, subject_c, desc_c, "Medium", sr_c)
                             if ok_c:
-                                db.insert_activity_log("Ticket Created", f"Client ticket {tn_c} submitted", client_email)
+                                try:
+                                    db.insert_activity_log("Ticket Created", f"Client ticket {tn_c} submitted", client_email)
+                                except Exception:
+                                    pass
                                 st.success(t('ticket_submitted'))
                                 st.rerun()
                             else:
@@ -7674,7 +7695,10 @@ elif page_matches(page, 'support_tickets'):
                                 {"uid": user["id"], "title": t_title.strip(), "desc": t_desc.strip()}
                             )
                             conn.commit()
-                        db.insert_activity_log("Ticket Created", f"New ticket: {t_title.strip()}", user.get("email", ""))
+                        try:
+                            db.insert_activity_log("Ticket Created", f"New ticket: {t_title.strip()}", user.get("email", ""))
+                        except Exception:
+                            pass
                         st.success(t('ticket_submitted'))
                         st.rerun()
                     except Exception as e:
@@ -7705,13 +7729,19 @@ elif page_matches(page, 'support_tickets'):
                             , format_func=_topt)
                             if st.button(t('update_btn'), key=f"upd_{row['id']}"):
                                 if db.update_ticket_status(row["id"], new_status):
-                                    db.insert_activity_log("Ticket Updated", f"Ticket #{row['id']} → {new_status}", user.get("email", ""))
+                                    try:
+                                        db.insert_activity_log("Ticket Updated", f"Ticket #{row['id']} → {new_status}", user.get("email", ""))
+                                    except Exception:
+                                        pass
                                     st.success(t('status_updated'))
                                     st.rerun()
                         with col_d:
                             if st.button("🗑️ Delete", key=f"del_{row['id']}"):
                                 if db.delete_ticket(row["id"]):
-                                    db.insert_activity_log("Ticket Deleted", f"Ticket #{row['id']} deleted", user.get("email", ""))
+                                    try:
+                                        db.insert_activity_log("Ticket Deleted", f"Ticket #{row['id']} deleted", user.get("email", ""))
+                                    except Exception:
+                                        pass
                                     st.warning(t('ticket_deleted'))
                                     st.rerun()
         except Exception as e:
@@ -8333,7 +8363,10 @@ elif page_matches(page, 'client_tickets'):
                         dc1, dc2, _ = st.columns([1, 1, 4])
                         if dc1.button(f"✅ {t('delete_ticket_btn')}", key=f"del_confirm_{row['id']}", type="primary"):
                             if db.delete_cs_ticket(row["id"]):
-                                db.insert_activity_log("Ticket Deleted", f"CS Ticket #{row['id']} deleted", user.get("email",""))
+                                try:
+                                    db.insert_activity_log("Ticket Deleted", f"CS Ticket #{row['id']} deleted", user.get("email",""))
+                                except Exception:
+                                    pass
                                 st.session_state.pop(_del_key, None)
                                 st.warning(t('cs_ticket_deleted_ok'))
                                 st.rerun()
@@ -8357,7 +8390,10 @@ elif page_matches(page, 'client_tickets'):
                                 st.error(t('client_subj_desc_required'))
                             else:
                                 if db.edit_cs_ticket(row["id"], new_sub, new_desc, new_cat, new_pri):
-                                    db.insert_activity_log("Ticket Updated", f"CS Ticket #{row['id']} edited", user.get("email",""))
+                                    try:
+                                        db.insert_activity_log("Ticket Updated", f"CS Ticket #{row['id']} edited", user.get("email",""))
+                                    except Exception:
+                                        pass
                                     st.session_state.pop(_edit_key, None)
                                     st.success(t('ticket_edited_success'))
                                     st.rerun()
@@ -9305,7 +9341,10 @@ elif page_matches(page, 'profile'):
                                                 with open(_av_path, 'wb') as _f:
                                                     _f.write(_avatar_file.getbuffer())
                                                 db.update_user_avatar(selected.get('id'), _av_path)
-                                                db.insert_activity_log("avatar_update", "Updated profile picture", current_user.get('email',''))
+                                                try:
+                                                    db.insert_activity_log("avatar_update", "Updated profile picture", current_user.get('email',''))
+                                                except Exception:
+                                                    pass
                                                 st.success(t('profile_pic_updated'))
                                                 _safe_rerun()
                                             except Exception as _e:
@@ -9385,7 +9424,10 @@ elif page_matches(page, 'profile'):
                                 db.insert_activity_log("profile_update", f"Updated profile info (name/phone)", current_user.get('email',''))
                                 if current_user.get('role') == 'manager' and new_role_sel != selected.get('role'):
                                     db.update_user_role(selected.get('id'), new_role_sel)
-                                    db.insert_activity_log("role_update", f"Changed role of {selected_email} → {new_role_sel}", current_user.get('email',''))
+                                    try:
+                                        db.insert_activity_log("role_update", f"Changed role of {selected_email} → {new_role_sel}", current_user.get('email',''))
+                                    except Exception:
+                                        pass
                                 st.success(t('profile_updated'))
                                 _safe_rerun()
                             except Exception as e:
