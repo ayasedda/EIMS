@@ -797,15 +797,15 @@ class Database:
         if Database._engine is None:
             Database._engine = create_engine(
                 self.db_url,
-                pool_size=1,
-                max_overflow=1,
+                pool_size=20,
+                max_overflow=40,
                 pool_pre_ping=True,
                 pool_recycle=1800,
                 pool_timeout=30,
                 connect_args={
-                    "connect_timeout": 10,
-                    "read_timeout": 20,
-                    "write_timeout": 20,
+                    "connect_timeout": 15,
+                    "read_timeout": 30,
+                    "write_timeout": 30,
                 },
                 echo=False
             )
