@@ -802,7 +802,11 @@ class Database:
                 pool_pre_ping=True,
                 pool_recycle=1800,
                 pool_timeout=30,
-                connect_args={"connect_timeout": 10},
+                connect_args={
+                    "connect_timeout": 10,
+                    "read_timeout": 20,
+                    "write_timeout": 20,
+                },
                 echo=False
             )
         # Ensure essential tables exist and schemas are up-to-date on construction
