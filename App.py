@@ -561,31 +561,6 @@ def get_page_key(page_label: str) -> str:
             return key
     return ''
 
-# ensure users table exists (safe to call repeatedly)
-try:
-    db.init_users_table()
-except Exception:
-    pass
-
-
-# ensure leave_requests and support_tickets tables exist
-try:
-    db.init_leave_table()
-    db.init_support_tickets_table()
-    db.init_cs_tables()
-except Exception:
-    pass
-
-# Initialize shipment-related tables
-try:
-    db.init_shipments_table()
-    db.init_cargo_items_table()
-    db.init_tracking_updates_table()
-    db.init_documents_table()
-    db.init_cargo_requests_table()
-    db.init_messages_table()
-except Exception as e:
-    print(f"Error initializing shipment tables: {e}")
 
 def _generate_salt():
     return secrets.token_hex(16)
