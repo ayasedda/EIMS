@@ -3509,9 +3509,12 @@ with st.sidebar:
     if 'user' in st.session_state and st.session_state['user']:
         if st.button(t('logout'), width='stretch'):
             logged_out_email = st.session_state['user'].get('email', '')
-            db.insert_activity_log("logout", "User logged out", logged_out_email)
+            try:
+                db.insert_activity_log("logout", "User logged out", logged_out_email)
+            except Exception:
+                pass
             st.session_state['user'] = None
-            st.query_params = {"page": "login"}
+            st.query_params["page"] = "login"
             _safe_rerun()
     
     st.markdown("---")
@@ -3529,22 +3532,24 @@ if page_matches(page, 'login'):
             if not email or not password:
                 st.error(t('provide_email_pass'))
             else:
+                _do_rerun = False
                 try:
                     user = db.get_user_by_email(email.strip() if isinstance(email, str) else email)
                     if not user:
-                        db.add_security_event(email, 'failed_login', description='No account found with that email')
-                        db.insert_activity_log("login_failed", "Login attempt failed: email not found", email)
+                        try:
+                            db.add_security_event(email, 'failed_login', description='No account found with that email')
+                            db.insert_activity_log("login_failed", "Login attempt failed: email not found", email)
+                        except Exception:
+                            pass
                         st.error(t('email_not_found'))
                         logger.warning(f"Failed login attempt for non-existent email: {email}")
                     else:
                         hash_val = _hash_password(password, user['salt'])
                         if hash_val == user['password_hash']:
-                            # ...existing code...
                             user_role = user.get('role', 'employee')
                             if user_role != 'client' and not IS_DESKTOP:
                                 st.error("⛔ This portal is for clients only. Employees and managers must use the desktop application.")
                                 st.stop()
-                            # جلب القسم من جدول company_records
                             department = None
                             try:
                                 db_records = db.fetch_dataframe("SELECT department FROM company_records WHERE email = :email ORDER BY id DESC LIMIT 1", {"email": user['email']})
@@ -3554,35 +3559,39 @@ if page_matches(page, 'login'):
                                 department = None
                             st.session_state['user'] = {'id': user['id'], 'email': user['email'], 'role': user_role, 'department': department}
                             logger.info(f"Successful login: {email} (role: {user_role}, department: {department})")
-                            db.insert_activity_log("login_success", f"User logged in | role: {user_role} | department: {department or 'N/A'}", email)
-                            # redirect based on role
                             try:
-                                if user_role == 'manager':
-                                    st.query_params = {"page": "dashboard"}
-                                elif user_role == 'employee':
-                                    st.query_params = {"page": "manage_shipments"}
-                                elif user_role == 'client':
-                                    st.query_params = {"page": "client_dashboard"}
-                                else:
-                                    st.query_params = {"page": "request_leave"}
+                                db.insert_activity_log("login_success", f"User logged in | role: {user_role} | department: {department or 'N/A'}", email)
                             except Exception:
                                 pass
-                            _safe_rerun()
+                            if user_role == 'manager':
+                                st.query_params["page"] = "dashboard"
+                            elif user_role == 'employee':
+                                st.query_params["page"] = "manage_shipments"
+                            elif user_role == 'client':
+                                st.query_params["page"] = "client_dashboard"
+                            else:
+                                st.query_params["page"] = "request_leave"
+                            _do_rerun = True
                         else:
                             st.error(t('incorrect_password'))
                             logger.warning(f"Failed login attempt for {email}: incorrect password")
-                            db.add_security_event(email, 'failed_login', description='Incorrect password')
-                            db.insert_activity_log("login_failed", "Login attempt failed: incorrect password", email)
+                            try:
+                                db.add_security_event(email, 'failed_login', description='Incorrect password')
+                                db.insert_activity_log("login_failed", "Login attempt failed: incorrect password", email)
+                            except Exception:
+                                pass
                 except Exception as e:
                     st.error(t('login_error'))
                     logger.error(f"Login error for {email}: {str(e)}")
+                if _do_rerun:
+                    _safe_rerun()
     
     # Forgot password link
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         if st.button(t('forgot_pass_btn'), use_container_width=True):
-            st.query_params = {"page": "forgot_password"}
+            st.query_params["page"] = "forgot_password"
             _safe_rerun()
 
 elif page_matches(page, 'forgot_password'):
@@ -3658,7 +3667,7 @@ The manager will:
     
     st.markdown("---")
     if st.button(t('back_to_login')):
-        st.query_params = {"page": "login"}
+        st.query_params["page"] = "login"
         _safe_rerun()
 
 elif page_matches(page, 'signup'):
@@ -3773,7 +3782,7 @@ elif page_matches(page, 'signup'):
         col_back1, col_back2, col_back3 = st.columns([1, 1, 1])
         with col_back2:
             if st.button(t('back_to_login'), use_container_width=True, key="back_to_login_btn"):
-                st.query_params = {"page": "login"}
+                st.query_params["page"] = "login"
                 _safe_rerun()
     
     else:
@@ -3859,18 +3868,17 @@ elif page_matches(page, 'signup'):
                     if existing:
                         st.error(t('email_already_exists'))
                     else:
+                        _signup_ok = False
                         try:
                             salt = _generate_salt()
                             password_hash = _hash_password(password, salt)
-                            # Create user account in users table
                             ok = db.create_user(email, password_hash, salt, role=role_choice)
                             if ok:
-                                # Add employee record to company_records with password
                                 db.add_record(
                                     employee_name=employee_name,
-                                    department=department,  # None for clients
-                                    position=position,      # None for clients
-                                    salary=salary,          # None for clients
+                                    department=department,
+                                    position=position,
+                                    salary=salary,
                                     hire_date=str(hire_date),
                                     email=email,
                                     phone=phone if phone else "",
@@ -3879,21 +3887,26 @@ elif page_matches(page, 'signup'):
                                 )
                                 user = db.get_user_by_email(email)
                                 st.session_state['user'] = {'id': user['id'], 'email': user['email'], 'role': user.get('role', 'employee')}
-                                # Clear signup type from session
                                 if 'signup_type' in st.session_state:
                                     del st.session_state['signup_type']
-                                _safe_rerun()
+                                if role_choice == 'client':
+                                    st.query_params["page"] = "client_dashboard"
+                                else:
+                                    st.query_params["page"] = "manage_shipments"
+                                _signup_ok = True
                             else:
                                 st.error(t('failed_create_account'))
                         except Exception as e:
                             st.error(f"❌ Error: {str(e)}")
+                        if _signup_ok:
+                            _safe_rerun()
 
 else:
     # For all other pages require login
     if 'user' not in st.session_state or not st.session_state['user']:
         st.warning(t('login_required_msg'))
         if st.button(t('go_login')):
-            st.query_params = {"page": "login"}
+            st.query_params["page"] = "login"
             _safe_rerun()
         st.stop()
 
