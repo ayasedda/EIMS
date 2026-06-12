@@ -1003,22 +1003,24 @@ if page_matches(page, 'login'):
             if not email or not password:
                 st.error(t('provide_email_pass'))
             else:
+                _login_do_rerun = False
                 try:
                     user = db.get_user_by_email(email.strip() if isinstance(email, str) else email)
                     if not user:
-                        db.add_security_event(email, 'failed_login', description='No account found with that email')
-                        db.insert_activity_log("login_failed", "Login attempt failed: email not found", email)
+                        try:
+                            db.add_security_event(email, 'failed_login', description='No account found with that email')
+                            db.insert_activity_log("login_failed", "Login attempt failed: email not found", email)
+                        except Exception:
+                            pass
                         st.error(t('email_not_found'))
                         logger.warning(f"Failed login attempt for non-existent email: {email}")
                     else:
                         hash_val = _hash_password(password, user['salt'])
                         if hash_val == user['password_hash']:
-                            # ...existing code...
-                            user_role = user.get('role', 'employee')
+                            user_role = user.get('role', 'employee') or 'employee'
                             if user_role != 'client' and not IS_DESKTOP:
                                 st.error("⛔ This portal is for clients only. Employees and managers must use the desktop application.")
                                 st.stop()
-                            # جلب القسم من جدول company_records
                             department = None
                             try:
                                 db_records = db.fetch_dataframe("SELECT department FROM company_records WHERE email = :email ORDER BY id DESC LIMIT 1", {"email": user['email']})
@@ -1032,25 +1034,13 @@ if page_matches(page, 'login'):
                                 db.insert_activity_log("login_success", f"User logged in | role: {user_role} | department: {department or 'N/A'}", email)
                             except Exception:
                                 pass
-                            if user_role == 'manager':
-                                st.session_state['_nav_page_key'] = 'dashboard'
-                            elif user_role == 'employee':
-                                st.session_state['_nav_page_key'] = 'manage_shipments'
-                            elif user_role == 'client':
-                                st.session_state['_nav_page_key'] = 'client_dashboard'
-                            else:
-                                st.session_state['_nav_page_key'] = 'request_leave'
+                            _page_key = {'manager': 'dashboard', 'employee': 'manage_shipments', 'client': 'client_dashboard'}.get(user_role, 'request_leave')
+                            st.session_state['_nav_page_key'] = _page_key
                             try:
-                                if user_role == 'manager':
-                                    st.query_params["page"] = "dashboard"
-                                elif user_role == 'employee':
-                                    st.query_params["page"] = "manage_shipments"
-                                elif user_role == 'client':
-                                    st.query_params["page"] = "client_dashboard"
-                                else:
-                                    st.query_params["page"] = "request_leave"
+                                st.query_params["page"] = _page_key
                             except Exception:
                                 pass
+                            _login_do_rerun = True
                         else:
                             st.error(t('incorrect_password'))
                             try:
@@ -1061,9 +1051,8 @@ if page_matches(page, 'login'):
                 except Exception as e:
                     st.error(t('login_error'))
                     logger.error(f"Login error for {email}: {str(e)}")
-                else:
-                    if st.session_state.get('user'):
-                        _safe_rerun()
+                if _login_do_rerun:
+                    _safe_rerun()
     
     # Forgot password link
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
