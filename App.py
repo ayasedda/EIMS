@@ -1350,10 +1350,13 @@ elif page_matches(page, 'signup'):
                                     password=password
                                 )
                                 user = db.get_user_by_email(email)
-                                st.session_state['user'] = {'id': user['id'], 'email': user['email'], 'role': user.get('role', 'employee')}
-                                # Clear signup type from session
+                                st.session_state['user'] = {'id': user['id'], 'email': user['email'], 'role': user.get('role', role_choice)}
                                 if 'signup_type' in st.session_state:
                                     del st.session_state['signup_type']
+                                if role_choice == 'client':
+                                    st.query_params = {"page": "client_dashboard"}
+                                else:
+                                    st.query_params = {"page": "manage_shipments"}
                                 _safe_rerun()
                             else:
                                 st.error(t('failed_create_account'))
