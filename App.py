@@ -626,7 +626,10 @@ import json as _json
 @st.cache_data(ttl=45, show_spinner=False, max_entries=300)
 def _qcache(query: str, params_json: str = "{}") -> "pd.DataFrame":
     _p = _json.loads(params_json) if params_json != "{}" else None
-    return db.fetch_dataframe(query, _p)
+    try:
+        return db.fetch_dataframe(query, _p)
+    except Exception:
+        return pd.DataFrame()
 
 def _q(query: str, params: dict = None) -> "pd.DataFrame":
     return _qcache(query, _json.dumps(params or {}, default=str))
