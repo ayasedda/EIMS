@@ -1028,8 +1028,10 @@ if page_matches(page, 'login'):
                                 department = None
                             st.session_state['user'] = {'id': user['id'], 'email': user['email'], 'role': user_role, 'department': department}
                             logger.info(f"Successful login: {email} (role: {user_role}, department: {department})")
-                            db.insert_activity_log("login_success", f"User logged in | role: {user_role} | department: {department or 'N/A'}", email)
-                            # redirect based on role
+                            try:
+                                db.insert_activity_log("login_success", f"User logged in | role: {user_role} | department: {department or 'N/A'}", email)
+                            except Exception:
+                                pass
                             try:
                                 if user_role == 'manager':
                                     st.query_params = {"page": "dashboard"}
@@ -1041,15 +1043,19 @@ if page_matches(page, 'login'):
                                     st.query_params = {"page": "request_leave"}
                             except Exception:
                                 pass
-                            _safe_rerun()
                         else:
                             st.error(t('incorrect_password'))
-                            logger.warning(f"Failed login attempt for {email}: incorrect password")
-                            db.add_security_event(email, 'failed_login', description='Incorrect password')
-                            db.insert_activity_log("login_failed", "Login attempt failed: incorrect password", email)
+                            try:
+                                db.add_security_event(email, 'failed_login', description='Incorrect password')
+                                db.insert_activity_log("login_failed", "Login attempt failed: incorrect password", email)
+                            except Exception:
+                                pass
                 except Exception as e:
                     st.error(t('login_error'))
                     logger.error(f"Login error for {email}: {str(e)}")
+                else:
+                    if st.session_state.get('user'):
+                        _safe_rerun()
     
     # Forgot password link
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
