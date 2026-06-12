@@ -985,7 +985,7 @@ with st.sidebar:
             logged_out_email = st.session_state['user'].get('email', '')
             db.insert_activity_log("logout", "User logged out", logged_out_email)
             st.session_state['user'] = None
-            st.query_params = {"page": "login"}
+            st.query_params["page"] = "login"
             _safe_rerun()
     
     st.markdown("---")
@@ -1034,13 +1034,13 @@ if page_matches(page, 'login'):
                                 pass
                             try:
                                 if user_role == 'manager':
-                                    st.query_params = {"page": "dashboard"}
+                                    st.query_params["page"] = "dashboard"
                                 elif user_role == 'employee':
-                                    st.query_params = {"page": "manage_shipments"}
+                                    st.query_params["page"] = "manage_shipments"
                                 elif user_role == 'client':
-                                    st.query_params = {"page": "client_dashboard"}
+                                    st.query_params["page"] = "client_dashboard"
                                 else:
-                                    st.query_params = {"page": "request_leave"}
+                                    st.query_params["page"] = "request_leave"
                             except Exception:
                                 pass
                         else:
@@ -1062,7 +1062,7 @@ if page_matches(page, 'login'):
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         if st.button(t('forgot_pass_btn'), use_container_width=True):
-            st.query_params = {"page": "forgot_password"}
+            st.query_params["page"] = "forgot_password"
             _safe_rerun()
 
 elif page_matches(page, 'forgot_password'):
@@ -1138,7 +1138,7 @@ The manager will:
     
     st.markdown("---")
     if st.button(t('back_to_login')):
-        st.query_params = {"page": "login"}
+        st.query_params["page"] = "login"
         _safe_rerun()
 
 elif page_matches(page, 'signup'):
@@ -1251,7 +1251,7 @@ elif page_matches(page, 'signup'):
         col_back1, col_back2, col_back3 = st.columns([1, 1, 1])
         with col_back2:
             if st.button(t('back_to_login'), use_container_width=True, key="back_to_login_btn"):
-                st.query_params = {"page": "login"}
+                st.query_params["page"] = "login"
                 _safe_rerun()
     
     else:
@@ -1337,6 +1337,7 @@ elif page_matches(page, 'signup'):
                     if existing:
                         st.error(t('email_already_exists'))
                     else:
+                        _signup_ok = False
                         try:
                             salt = _generate_salt()
                             password_hash = _hash_password(password, salt)
@@ -1360,21 +1361,23 @@ elif page_matches(page, 'signup'):
                                 if 'signup_type' in st.session_state:
                                     del st.session_state['signup_type']
                                 if role_choice == 'client':
-                                    st.query_params = {"page": "client_dashboard"}
+                                    st.query_params["page"] = "client_dashboard"
                                 else:
-                                    st.query_params = {"page": "manage_shipments"}
-                                _safe_rerun()
+                                    st.query_params["page"] = "manage_shipments"
+                                _signup_ok = True
                             else:
                                 st.error(t('failed_create_account'))
                         except Exception as e:
                             st.error(f"❌ Error: {str(e)}")
+                        if _signup_ok:
+                            _safe_rerun()
 
 else:
     # For all other pages require login
     if 'user' not in st.session_state or not st.session_state['user']:
         st.warning(t('login_required_msg'))
         if st.button(t('go_login')):
-            st.query_params = {"page": "login"}
+            st.query_params["page"] = "login"
             _safe_rerun()
         st.stop()
 
