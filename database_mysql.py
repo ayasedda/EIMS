@@ -797,17 +797,12 @@ class Database:
         if Database._engine is None:
             Database._engine = create_engine(
                 self.db_url,
-                pool_size=2,
-                max_overflow=3,
+                pool_size=20,
+                max_overflow=40,
                 pool_pre_ping=True,
-                pool_recycle=60,
-                pool_timeout=8,
-                echo=False,
-                connect_args={
-                    "connect_timeout": 5,
-                    "read_timeout": 8,
-                    "write_timeout": 8,
-                }
+                pool_recycle=1800,
+                pool_timeout=10,
+                echo=False
             )
         # Ensure essential tables exist and schemas are up-to-date on construction
         try:
