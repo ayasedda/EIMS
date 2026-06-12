@@ -455,7 +455,7 @@ def _strip_nav_badge(label: str) -> str:
 
 def generate_invoice_pdf(row, lang='en'):
     try:
-        from fpdf import FPDF
+        from fpdf import FPDF  # type: ignore[import-untyped]
     except ImportError:
         return None
     pdf = FPDF()
@@ -1032,6 +1032,14 @@ if page_matches(page, 'login'):
                                 db.insert_activity_log("login_success", f"User logged in | role: {user_role} | department: {department or 'N/A'}", email)
                             except Exception:
                                 pass
+                            if user_role == 'manager':
+                                st.session_state['_nav_page_key'] = 'dashboard'
+                            elif user_role == 'employee':
+                                st.session_state['_nav_page_key'] = 'manage_shipments'
+                            elif user_role == 'client':
+                                st.session_state['_nav_page_key'] = 'client_dashboard'
+                            else:
+                                st.session_state['_nav_page_key'] = 'request_leave'
                             try:
                                 if user_role == 'manager':
                                     st.query_params["page"] = "dashboard"
@@ -1361,8 +1369,10 @@ elif page_matches(page, 'signup'):
                                 if 'signup_type' in st.session_state:
                                     del st.session_state['signup_type']
                                 if role_choice == 'client':
+                                    st.session_state['_nav_page_key'] = 'client_dashboard'
                                     st.query_params["page"] = "client_dashboard"
                                 else:
+                                    st.session_state['_nav_page_key'] = 'manage_shipments'
                                     st.query_params["page"] = "manage_shipments"
                                 _signup_ok = True
                             else:
