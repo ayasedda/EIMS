@@ -3249,6 +3249,15 @@ st.markdown("""
     .status-approved { background: #28a745; }
     .status-rejected { background: #dc3545; }
     .request-row { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+    [data-testid="metric-container"] {
+        background-color: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 16px 20px;
+        box-shadow: 0 2px 6px rgba(16,24,40,0.06);
+    }
+    [data-testid="stMetricLabel"] { font-size: 13px !important; color: #6b7280 !important; font-weight: 500 !important; }
+    [data-testid="stMetricValue"] { font-size: 1.8rem !important; font-weight: 700 !important; color: #1f2937 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -4220,55 +4229,50 @@ elif page_matches(page, 'add'):
                     proceed_with_add = True
             
             if 'proceed_with_add' in locals() and proceed_with_add:
+                    _add_rerun = False
                     try:
-                        # Add record to company_records (no password field)
                         db.add_record(
                             employee_name=employee_name,
-                            department=department,  # None for clients
-                            position=position,      # None for clients
-                            salary=salary,          # None for clients
+                            department=department,
+                            position=position,
+                            salary=salary,
                             hire_date=str(hire_date),
                             email=email,
                             phone=phone,
                             status=status,
-                            password=''  # Empty - authentication via users table only
+                            password=''
                         )
                         try:
                             db.insert_activity_log("add_record", f"Added record: {employee_name} | Dept: {department or 'N/A'}", st.session_state.get('user',{}).get('email',''))
                         except Exception:
                             pass
-                        
-                        # Create user account if requested
                         if create_account:
-                            # Check if user already exists
                             existing_user = db.get_user_by_email(email)
                             if not existing_user:
-                                # Generate or use provided password
                                 if auto_password:
                                     generated_password = secrets.token_urlsafe(10)
                                     password_to_use = generated_password
                                 else:
                                     password_to_use = user_password if user_password else secrets.token_urlsafe(10)
-                                
-                                # Create user account
                                 salt = _generate_salt()
                                 password_hash = _hash_password(password_to_use, salt)
                                 user_created = db.create_user(email, password_hash, salt, role=account_role)
-                                
                                 if user_created:
                                     if auto_password:
                                         st.info(f"📋 Login credentials — Email: `{email}` | Password: `{password_to_use}`")
                                     st.success("✅ Record added and user account created successfully!")
-                                    _safe_rerun()
+                                    _add_rerun = True
                                 else:
                                     st.warning("✅ Record added but failed to create user account (email might already exist)")
                             else:
                                 st.success("✅ Record added! User account already exists for this email.")
                         else:
                             st.success("✅ Record added successfully!")
-                            _safe_rerun()
+                            _add_rerun = True
                     except Exception as e:
                         st.error(f"❌ Error: {str(e)}")
+                    if _add_rerun:
+                        _safe_rerun()
             else:
                 st.error(f"⚠️ {t('fill_required')} (*)")
 
@@ -4459,13 +4463,19 @@ elif page_matches(page, 'delete'):
                 col1, col2, col3 = st.columns([1, 1, 2])
                 with col1:
                     if st.button(t('confirm_delete_btn'), width='stretch', type="primary"):
+                        _del_ok = False
                         try:
                             db.delete_record(record_id)
-                            db.insert_activity_log("delete_record", f"Deleted record ID:{record_id}", st.session_state.get('user',{}).get('email',''))
+                            try:
+                                db.insert_activity_log("delete_record", f"Deleted record ID:{record_id}", st.session_state.get('user',{}).get('email',''))
+                            except Exception:
+                                pass
                             st.success(f"✅ {t('record_deleted')}")
-                            _safe_rerun()
+                            _del_ok = True
                         except Exception as e:
                             st.error(f"❌ {str(e)}")
+                        if _del_ok:
+                            _safe_rerun()
                 with col2:
                     if st.button(f"❌ {t('cancel')}", width='stretch'):
                         st.info(t('delete_cancelled'))
@@ -4597,6 +4607,7 @@ elif page_matches(page, 'request_leave'):
                 if start_date > end_date:
                     st.error(t('date_range_err'))
                 else:
+                    _leave_ok = False
                     try:
                         # handle optional attachment save (desktop only)
                         attachment_name = ''
@@ -4620,9 +4631,12 @@ elif page_matches(page, 'request_leave'):
                         except Exception:
                             pass
                         st.success(t('leave_submitted'))
-                        _safe_rerun()
+                        _leave_ok = True
                     except Exception as e:
                         st.error(f"Failed to submit request: {str(e)}")
+                        _leave_ok = False
+                    if _leave_ok:
+                        _safe_rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
     # My requests
