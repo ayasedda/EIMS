@@ -3662,14 +3662,14 @@ The manager will:
         _safe_rerun()
 
 elif page_matches(page, 'signup'):
-    # Web portal: skip account type selection, go straight to client form
+    # Web: auto-select client. Desktop: show selection screen.
     if 'signup_type' not in st.session_state and not IS_DESKTOP:
         st.session_state['signup_type'] = 'client'
         _safe_rerun()
-    if False:  # disabled: account type selection
+    if 'signup_type' not in st.session_state and IS_DESKTOP:
         # Show account type selection page
-        st.markdown("<h1 style='text-align: center; color: #1E88E5; margin-bottom: 10px;'> Create New Account</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #888; font-size: 18px; margin-bottom: 40px;'>Choose the type of account you want to register</p>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='text-align: center; color: #1E88E5; margin-bottom: 10px;'>{t('create_new_account')}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: #888; font-size: 18px; margin-bottom: 40px;'>{t('choose_account_type')}</p>", unsafe_allow_html=True)
         
         # Add spacing
         st.markdown("<br>", unsafe_allow_html=True)
@@ -3682,10 +3682,9 @@ elif page_matches(page, 'signup'):
             with col_btn1:
                 # Employee button as large card
                 employee_clicked = st.button(
-                    label="👨‍💼\n\nEmployee Account",
+                    label=f"👨‍💼\n\n{t('employee_account_lbl')}",
                     key="btn_employee",
                     use_container_width=True,
-                    help="Register as an employee with complete access"
                 )
                 if employee_clicked:
                     st.session_state['signup_type'] = 'employee'
@@ -3718,10 +3717,9 @@ elif page_matches(page, 'signup'):
             with col_btn2:
                 # Client button as large card
                 client_clicked = st.button(
-                    label="👤\n\nClient Account",
+                    label=f"👤\n\n{t('client_account_lbl')}",
                     key="btn_client",
                     use_container_width=True,
-                    help="Register as a client with basic access"
                 )
                 if client_clicked:
                     st.session_state['signup_type'] = 'client'
