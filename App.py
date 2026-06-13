@@ -747,7 +747,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Display title
-st.title("📊 EIMS")
+st.title("EIMS")
 st.markdown("---")
 
 _logo_abs = os.path.join(_base_dir, "assets", "logo.png")
@@ -2285,7 +2285,7 @@ elif page_matches(page, 'manage_users'):
 
 # Export Employees (Manager only)
 elif page_matches(page, 'export_employees'):
-    st.header(f"📥 {t('export_employees_hdr')}")
+    st.header(f"{t('export_employees_hdr')}")
     user = st.session_state.get('user')
     if not user or user.get('role') != 'manager':
         st.error(t('only_managers_export'))
@@ -2402,7 +2402,7 @@ elif page_matches(page, 'export_employees'):
 
 # Export Shipments (Employee / Manager)
 elif page_matches(page, 'export_shipments'):
-    st.header(f"📥 {t('export_shipments_hdr')}")
+    st.header(f"{t('export_shipments_hdr')}")
     user = st.session_state.get('user')
     if not user or user.get('role') not in ['employee', 'manager']:
         st.error(t('only_emp_mgr_export'))
@@ -2651,7 +2651,7 @@ elif page_matches(page, 'manage_shipments'):
                                             st.error(f"❌ Error: {str(e)}")
                         
                         with col_delete:
-                            st.markdown("#### 🗑️ Delete Cargo Item")
+                            st.markdown("#### Delete Cargo Item")
                             item_to_delete = st.selectbox("Select item to delete:", 
                                 [(f"{row['id']} - {row['item_name']}", row['id']) for _, row in cargo_df.iterrows()],
                                 format_func=lambda x: x[0], key="delete_cargo_select")
@@ -2679,7 +2679,7 @@ elif page_matches(page, 'manage_shipments'):
                         st.info(t('no_cargo_items'))
                     
                     st.markdown("---")
-                    st.subheader(f"➕ {t('add_cargo')}")
+                    st.subheader(f"{t('add_cargo')}")
                     with st.form("add_cargo_form"):
                         c1, c2 = st.columns(2)
                         with c1:
@@ -2905,7 +2905,7 @@ elif page_matches(page, 'client_dashboard'):
     _cname_row = _q("SELECT full_name FROM users WHERE id=:uid", {"uid": _cid})
     _cname = str(_cname_row.iloc[0]["full_name"]) if (_cname_row is not None and not _cname_row.empty and _cname_row.iloc[0]["full_name"]) else _cemail
 
-    st.markdown(f"## 👋 {t('welcome_back')}, **{_cname}**")
+    st.markdown(f"## {t('welcome_back')}, **{_cname}**")
     st.markdown("---")
 
     # ── Metric cards ──────────────────────────────────────────────────────────
@@ -2935,7 +2935,7 @@ elif page_matches(page, 'client_dashboard'):
     OFF_COLOR    = {"Sent":"🟡","Accepted":"🟢","Rejected":"🔴","Draft":"⚫"}
 
     # ── Recent Shipments ──────────────────────────────────────────────────────
-    st.subheader(f"🚢 {t('recent_shipments')}")
+    st.subheader(f"{t('recent_shipments')}")
     _rshp = _q(
         "SELECT shipment_number, status, origin, destination, expected_arrival "
         "FROM shipments WHERE client_id=:ci ORDER BY id DESC LIMIT 5", {"ci": _cid}
@@ -2955,7 +2955,7 @@ elif page_matches(page, 'client_dashboard'):
     st.markdown("---")
 
     # ── Recent Tickets ────────────────────────────────────────────────────────
-    st.subheader(f"🎫 {t('recent_tickets')}")
+    st.subheader(f"{t('recent_tickets')}")
     _rtkt = _q(
         "SELECT ticket_number, subject, status, priority FROM cs_tickets "
         "WHERE client_id=:ci ORDER BY created_at DESC LIMIT 4", {"ci": _cid}
@@ -2973,7 +2973,7 @@ elif page_matches(page, 'client_dashboard'):
     st.markdown("---")
 
     # ── Recent Offers ─────────────────────────────────────────────────────────
-    st.subheader(f"📋 {t('recent_offers')}")
+    st.subheader(f"{t('recent_offers')}")
     _roff = _q(
         "SELECT offer_number, freight_type, origin, destination, total_value, status "
         "FROM sales_offers WHERE client_email=:ce ORDER BY created_at DESC LIMIT 4", {"ce": _cemail}
@@ -3096,7 +3096,7 @@ elif page_matches(page, 'my_shipments'):
         st.error(f"Error loading your shipments: {str(e)}")
 
 elif page_matches(page, 'rate_service'):
-    st.header("⭐ " + t('rate_service'))
+    st.header("" + t('rate_service'))
     st.caption(t('rate_service_caption'))
     st.markdown("---")
 
@@ -3234,7 +3234,7 @@ elif page_matches(page, 'rate_service'):
                 pass
 
 elif page_matches(page, 'my_tickets'):
-    st.header("🎫 " + t('my_tickets'))
+    st.header("" + t('my_tickets'))
     st.markdown("---")
 
     user = st.session_state.get("user")
@@ -3444,7 +3444,7 @@ elif page_matches(page, 'my_tickets'):
                                 st.error(t('failed_create_ticket_err'))
 
 elif page_matches(page, 'my_invoices'):
-    st.header("🧾 " + t('my_invoices'))
+    st.header("" + t('my_invoices'))
     st.markdown("---")
 
     user = st.session_state.get("user")
@@ -3522,7 +3522,7 @@ elif page_matches(page, 'my_invoices'):
             st.info(t('no_invoices'))
 
 elif page_matches(page, 'my_offers'):
-    st.header("📋 " + t('my_offers'))
+    st.header("" + t('my_offers'))
     st.markdown("---")
 
     user = st.session_state.get("user")
@@ -4072,7 +4072,7 @@ elif page_matches(page, 'finance_dashboard'):
         st.info(t('no_invoices'))
 
 elif page_matches(page, 'invoices'):
-    st.header("🧾 " + t('invoices'))
+    st.header("" + t('invoices'))
     st.markdown("---")
     tab_list, tab_new = st.tabs([t('tab_all_invoices'), t('tab_new_invoice')])
 
@@ -4139,7 +4139,7 @@ elif page_matches(page, 'invoices'):
                         st.error(t('failed_create_invoice_err'))
 
 elif page_matches(page, 'payments'):
-    st.header("💳 " + t('payments'))
+    st.header("" + t('payments'))
     st.markdown("---")
     tab_list, tab_new = st.tabs([t('tab_payment_history'), t('tab_record_payment')])
 
@@ -4203,7 +4203,7 @@ elif page_matches(page, 'payments'):
                             st.error(t('failed_record_payment_err'))
 
 elif page_matches(page, 'expenses'):
-    st.header("💸 " + t('expenses'))
+    st.header("" + t('expenses'))
     st.markdown("---")
     tab_list, tab_add = st.tabs([t('tab_all_expenses'), t('tab_add_expense')])
 
@@ -4273,7 +4273,7 @@ elif page_matches(page, 'expenses'):
                         st.error(t('failed_add_expense_err'))
 
 elif page_matches(page, 'financial_reports'):
-    st.header("📊 " + t('financial_reports'))
+    st.header("" + t('financial_reports'))
     st.markdown("---")
 
     # ── Load data ─────────────────────────────────────────────────────────────
@@ -4336,7 +4336,7 @@ elif page_matches(page, 'financial_reports'):
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.subheader("🧾 Invoice Status Breakdown")
+        st.subheader("Invoice Status Breakdown")
         if not inv_all.empty:
             status_grp = inv_all.groupby("status").agg(
                 count=("id","count"), amount=("total","sum")
@@ -4363,7 +4363,7 @@ elif page_matches(page, 'financial_reports'):
             st.dataframe(status_grp, use_container_width=True, hide_index=True)
 
     with col_b:
-        st.subheader("📤 Expenses by Category")
+        st.subheader("Expenses by Category")
         if not exp_all.empty:
             cat_sum = exp_all.groupby("category")["amount"].sum().reset_index().sort_values("amount")
             fig_cat = go.Figure(go.Bar(
@@ -4390,7 +4390,7 @@ elif page_matches(page, 'financial_reports'):
     col_c, col_d = st.columns(2)
 
     with col_c:
-        st.subheader("🏆 Top Clients by Revenue")
+        st.subheader("Top Clients by Revenue")
         if not inv_all.empty:
             paid_inv = inv_all[inv_all["status"] == "Paid"]
             if not paid_inv.empty:
@@ -4421,7 +4421,7 @@ elif page_matches(page, 'financial_reports'):
                 st.plotly_chart(fig_top, use_container_width=True)
 
     with col_d:
-        st.subheader("📥 Invoiced vs Collected by Month")
+        st.subheader("Invoiced vs Collected by Month")
         if not inv_all.empty and "issue_date" in inv_all.columns:
             inv_all["month"] = pd.to_datetime(inv_all["issue_date"]).dt.strftime("%Y-%m")
             inv_month = inv_all.groupby("month").agg(
@@ -4445,7 +4445,7 @@ elif page_matches(page, 'financial_reports'):
     st.markdown("---")
 
     # ── P&L Summary Table ──────────────────────────────────────────────────────
-    st.subheader("📋 " + t('profit_loss') + " — Monthly Summary")
+    st.subheader(t('profit_loss') + " — Monthly Summary")
     if not merged.empty:
         tbl = merged.copy()
         tbl["margin"] = tbl.apply(
@@ -4760,7 +4760,7 @@ elif page_matches(page, 'marketing_analytics'):
                         st.rerun()
 
 elif page_matches(page, 'social_media'):
-    st.header("📱 " + t('social_media'))
+    st.header("" + t('social_media'))
     user = st.session_state["user"]
     tab_feed, tab_new, tab_stats = st.tabs([f"📢 {t('tab_posts')}", f"✏️ {t('tab_new_post')}", f"📊 {t('tab_stats')}"])
 
@@ -4972,7 +4972,7 @@ elif page_matches(page, 'it_dashboard'):
     open_tickets     = st.session_state.get("it_dash_open_tickets", 0)
     perf_history     = st.session_state.get("it_dash_perf_history", [])
 
-    st.header("💻 " + t('it_dashboard'))
+    st.header("" + t('it_dashboard'))
     st.caption(f"{t('last_updated')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
 
@@ -5001,7 +5001,7 @@ elif page_matches(page, 'it_dashboard'):
     with col_right:
         online_count  = sum(1 for s in server_stats if s.get("is_online"))
         offline_count = len(server_stats) - online_count
-        st.subheader(f"Devices ({online_count} 🟢 Online / {offline_count} 🔴 Offline)")
+        st.subheader(f"Devices ({online_count} Online / {offline_count} Offline)")
         if server_stats:
             for s in server_stats:
                 cpu_s    = s.get("cpu", 0) or 0
@@ -5013,12 +5013,12 @@ elif page_matches(page, 'it_dashboard'):
                 if is_online:
                     uptime_h = round((s.get("uptime_seconds") or 0) / 3600, 1)
                     cpu_color = "green" if cpu_s < 70 else "orange" if cpu_s < 90 else "red"
-                    st.markdown(f"🟢 **{name_s}** `{ip_s}`")
+                    st.markdown(f"**{name_s}** `{ip_s}` — Online")
                     st.markdown(f"&nbsp;&nbsp;&nbsp;CPU: `{cpu_s:.1f}%` | RAM: `{s.get('ram',0):.1f}%` | Disk: `{s.get('disk',0):.1f}%` | Uptime: `{uptime_h}h`")
                     st.progress(min(int(cpu_s), 100))
                 else:
                     mins_ago = last_seen // 60
-                    st.markdown(f"🔴 **{name_s}** `{ip_s}` — *Offline since {mins_ago} min ago*")
+                    st.markdown(f"**{name_s}** `{ip_s}` — *Offline since {mins_ago} min ago*")
                 st.markdown("---")
         else:
             st.info(t('no_devices_registered'))
@@ -5050,7 +5050,7 @@ elif page_matches(page, 'system_management'):
     except Exception:
         psutil = None
     import time as _time
-    st.header("💻 " + t('system_management'))
+    st.header("" + t('system_management'))
     st.markdown("---")
 
     if psutil is None:
@@ -5120,7 +5120,7 @@ elif page_matches(page, 'system_management'):
     n2.metric(t('total_received'), f"{net_live.bytes_recv / (1024**3):.2f} GB")
 
 elif page_matches(page, 'support_tickets'):
-    st.header("🎫 " + t('support_tickets'))
+    st.header("" + t('support_tickets'))
     user = st.session_state["user"]
     tab1, tab2 = st.tabs([f"➕ {t('tab_new_ticket')}", t('tab_all_tickets')])
 
@@ -5193,7 +5193,7 @@ elif page_matches(page, 'support_tickets'):
             st.error(f"Error loading tickets: {e}")
 
 elif page_matches(page, 'security'):
-    st.header("🔒 " + t('security'))
+    st.header("" + t('security'))
     st.markdown("---")
     tab_events, tab_users = st.tabs([f"🚨 {t('tab_security_events')}", f"👥 {t('tab_user_activity')}"])
 
@@ -5300,7 +5300,7 @@ elif page_matches(page, 'logistics_dashboard'):
         st.dataframe(disp, use_container_width=True, hide_index=True)
 
 elif page_matches(page, 'shipments'):
-    st.header("🚢 " + t('shipments'))
+    st.header("" + t('shipments'))
     st.markdown("---")
     tab_all, tab_new, tab_track = st.tabs([t('tab_all_shipments'), t('tab_new_shipment'), t('tab_tracking_timeline')])
 
@@ -5484,7 +5484,7 @@ elif page_matches(page, 'shipments'):
             st.info(t('no_ship_available'))
 
 elif page_matches(page, 'routes'):
-    st.header("🗺️ " + t('routes'))
+    st.header("" + t('routes'))
     st.markdown("---")
     tab_list, tab_add = st.tabs([t('tab_active_routes'), t('tab_add_route')])
 
@@ -5720,7 +5720,7 @@ elif page_matches(page, 'customer_service_dashboard'):
         st.info(f"📬 {t('unread_feedback_msg').format(n=summary['unread_feedback'])}")
 
 elif page_matches(page, 'client_tickets'):
-    st.header("🎫 " + t('client_tickets'))
+    st.header("" + t('client_tickets'))
     st.markdown("---")
 
     CATEGORIES = ["Shipment Inquiry","Document Request","Customs Issue","Complaint","Rate Request","General Inquiry"]
@@ -5871,7 +5871,7 @@ elif page_matches(page, 'client_tickets'):
         st.info(t('no_tickets_found'))
 
 elif page_matches(page, 'customer_feedback'):
-    st.header("💬 " + t('customer_feedback'))
+    st.header("" + t('customer_feedback'))
     st.markdown("---")
 
     f_unread = st.checkbox(t('show_unread_only'), value=False)
