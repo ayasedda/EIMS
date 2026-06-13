@@ -398,6 +398,10 @@ def apply_theme():
     else:
         css = """
         <style>
+        [data-testid="stSidebar"] [data-testid="stImage"] img {
+            mix-blend-mode: multiply;
+            border-radius: 8px;
+        }
         </style>
         """
     st.markdown(css, unsafe_allow_html=True)
@@ -747,11 +751,11 @@ st.title("📊 EIMS")
 st.markdown("---")
 
 _logo_abs = os.path.join(_base_dir, "assets", "logo.png")
-if os.path.exists(_logo_abs):
-    st.logo(_logo_abs, size="medium")
 
 with st.sidebar:
-    if not os.path.exists(_logo_abs):
+    if os.path.exists(_logo_abs):
+        st.image(_logo_abs, width=120)
+    else:
         st.header("EIMS")
 
     # عرض عنوان القسم الحالي تحت اللوجو ومحاذاته لليسار
