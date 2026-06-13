@@ -25,8 +25,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Configure page
-_logo_path = "assets/logo.png"
+# Configure page — use __file__-relative path so it works on Streamlit Cloud too
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+_logo_path = os.path.join(_base_dir, "assets", "logo.png")
 _page_icon = Image.open(_logo_path) if os.path.exists(_logo_path) else "📊"
 st.set_page_config(
     page_title="EIMS",
@@ -544,31 +545,29 @@ def get_page_key(page_label: str) -> str:
             return key
     return ''
 
-# ensure users table exists (safe to call repeatedly)
-try:
-    db.init_users_table()
-except Exception:
-    pass
+@st.cache_resource(show_spinner=False)
+def _init_all_tables():
+    try:
+        db.init_users_table()
+    except Exception:
+        pass
+    try:
+        db.init_leave_table()
+        db.init_support_tickets_table()
+        db.init_cs_tables()
+    except Exception:
+        pass
+    try:
+        db.init_shipments_table()
+        db.init_cargo_items_table()
+        db.init_tracking_updates_table()
+        db.init_documents_table()
+        db.init_cargo_requests_table()
+        db.init_messages_table()
+    except Exception as e:
+        print(f"Error initializing shipment tables: {e}")
 
-
-# ensure leave_requests and support_tickets tables exist
-try:
-    db.init_leave_table()
-    db.init_support_tickets_table()
-    db.init_cs_tables()
-except Exception:
-    pass
-
-# Initialize shipment-related tables
-try:
-    db.init_shipments_table()
-    db.init_cargo_items_table()
-    db.init_tracking_updates_table()
-    db.init_documents_table()
-    db.init_cargo_requests_table()
-    db.init_messages_table()
-except Exception as e:
-    print(f"Error initializing shipment tables: {e}")
+_init_all_tables()
 
 def _generate_salt():
     return secrets.token_hex(16)
@@ -747,16 +746,12 @@ st.markdown("""
 st.title("📊 EIMS")
 st.markdown("---")
 
+_logo_abs = os.path.join(_base_dir, "assets", "logo.png")
+if os.path.exists(_logo_abs):
+    st.logo(_logo_abs, size="medium")
+
 with st.sidebar:
-    # Display logo in sidebar
-    logo_png = "assets/logo.png"
-    logo_svg = "assets/logo.svg"
-    if os.path.exists(logo_png):
-        st.image(logo_png, width=80, output_format="PNG")
-    elif os.path.exists(logo_svg):
-        with open(logo_svg, "r", encoding="utf-8") as f:
-            st.markdown(f'''<div style="text-align: center; margin: 10px 0; transform: scale(0.8);">{f.read()}</div>''', unsafe_allow_html=True)
-    else:
+    if not os.path.exists(_logo_abs):
         st.header("EIMS")
 
     # عرض عنوان القسم الحالي تحت اللوجو ومحاذاته لليسار
@@ -881,7 +876,6 @@ with st.sidebar:
                 idx = _find_page_index(target_label)
                 if idx is not None:
                     default_index = idx
-                    st.session_state[_radio_key] = page_options[idx]
         else:
             qp = st.query_params
             if qp and 'page' in qp:
@@ -1057,7 +1051,16 @@ if page_matches(page, 'login'):
                             if user_role == 'manager':
                                 st.query_params["page"] = "dashboard"
                             elif user_role == 'employee':
-                                st.query_params["page"] = "manage_shipments"
+                                _dept_first = {
+                                    'Finance': 'finance_dashboard',
+                                    'Marketing': 'marketing_dashboard',
+                                    'IT': 'it_dashboard',
+                                    'Logistics': 'logistics_dashboard',
+                                    'Customer Service': 'customer_service_dashboard',
+                                    'Administration': 'administration_dashboard',
+                                    'Sales': 'sales_dashboard',
+                                }
+                                st.query_params["page"] = _dept_first.get(department, 'request_leave')
                             elif user_role == 'client':
                                 st.query_params["page"] = "client_dashboard"
                             else:
@@ -1075,8 +1078,9 @@ if page_matches(page, 'login'):
                     st.error(t('login_error'))
                     logger.error(f"Login error for {email}: {str(e)}")
                 if _do_rerun:
+                    st.session_state.pop('_page_nav_radio', None)
                     _safe_rerun()
-    
+
     # Forgot password link
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1])
@@ -1163,8 +1167,8 @@ The manager will:
 
 elif page_matches(page, 'signup'):
     # Web portal: skip account type selection, go straight to client form
-    if 'signup_type' not in st.session_state and not IS_DESKTOP:
-        st.session_state['signup_type'] = 'client'
+    if 'signup_type' not in st.session_state:
+        st.session_state['signup_type'] = 'client' if not IS_DESKTOP else 'employee'
         _safe_rerun()
     if False:  # disabled: account type selection
         # Show account type selection page
@@ -1377,19 +1381,30 @@ elif page_matches(page, 'signup'):
                                     password=password
                                 )
                                 user = db.get_user_by_email(email)
-                                st.session_state['user'] = {'id': user['id'], 'email': user['email'], 'role': user.get('role', 'employee')}
+                                _dept_val = department if role_choice != 'client' else None
+                                st.session_state['user'] = {'id': user['id'], 'email': user['email'], 'role': user.get('role', 'employee'), 'department': _dept_val}
                                 if 'signup_type' in st.session_state:
                                     del st.session_state['signup_type']
                                 if role_choice == 'client':
                                     st.query_params["page"] = "client_dashboard"
                                 else:
-                                    st.query_params["page"] = "manage_shipments"
+                                    _dept_first = {
+                                        'Finance': 'finance_dashboard',
+                                        'Marketing': 'marketing_dashboard',
+                                        'IT': 'it_dashboard',
+                                        'Logistics': 'logistics_dashboard',
+                                        'Customer Service': 'customer_service_dashboard',
+                                        'Administration': 'administration_dashboard',
+                                        'Sales': 'sales_dashboard',
+                                    }
+                                    st.query_params["page"] = _dept_first.get(department, 'request_leave')
                                 _signup_ok = True
                             else:
                                 st.error(t('failed_create_account'))
                         except Exception as e:
                             st.error(f"❌ Error: {str(e)}")
                         if _signup_ok:
+                            st.session_state.pop('_page_nav_radio', None)
                             _safe_rerun()
 
 else:
@@ -1401,130 +1416,8 @@ else:
             _safe_rerun()
         st.stop()
 
-    # IT Dashboard: Only for IT employees and only if main page is 'it_dashboard'
     user = st.session_state['user']
     department = user.get('department')
-    if isinstance(department, str) and department.lower() == 'it' and page_matches(page, 'it_dashboard'):
-        st.header(t('it_dashboard'))
-        st.markdown("---")
-        # Sidebar navigation for IT features
-        it_pages = [
-            t('it_dashboard'),
-            t('db_management'),
-            t('support_tickets'),
-            t('security_mgmt'),
-            t('performance_monitor'),
-            t('bug_tracking'),
-            t('activity_logs')
-        ]
-        selected_it_page = st.sidebar.radio(t('it_pages_label'), it_pages, key="it_page")
-
-        if page_matches(selected_it_page, 'it_dashboard'):
-            st.info(t('select_section'))
-        elif page_matches(selected_it_page, 'system_management'):
-            st.subheader(f"1. {t('system_management')}")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric(t('server_status'), t('running'), delta="+0")
-                st.write(f"{t('last_check')} 2026-03-26 10:00")
-            with col2:
-                if st.button(t('restart_server')):
-                    st.success(t('server_restarted'))
-                if st.button(t('check_status')):
-                    st.info(t('status_checked'))
-
-        elif page_matches(selected_it_page, 'db_management'):
-            st.subheader(f"2. {t('db_management')}")
-            st.write(f"{t('last_backup')}: 2026-03-25 23:00")
-            st.write(f"{t('db_size')}: 120 MB")
-            colb1, colb2 = st.columns(2)
-            with colb1:
-                if st.button(t('create_backup')):
-                    st.success(t('backup_created'))
-            with colb2:
-                if st.button(t('restore_backup')):
-                    st.warning(t('restore_started'))
-
-        elif page_matches(selected_it_page, 'support_tickets'):
-            st.subheader(f"3. {t('support_ticket_sys')}")
-            st.write(t('create_ticket'))
-            with st.form("ticket_form", clear_on_submit=True):
-                ticket_title = st.text_input(t('ticket_title_lbl'))
-                ticket_desc = st.text_area(t('ticket_desc_lbl'))
-                submit_ticket = st.form_submit_button(t('submit_ticket_btn'))
-                if submit_ticket:
-                    if not ticket_title or not ticket_desc:
-                        st.error(t('fill_all_fields'))
-                    else:
-                        try:
-                            db.get_connection().execute(
-                                text("""
-                                    INSERT INTO support_tickets (user_id, title, description, status, created_at)
-                                    VALUES (:user_id, :title, :desc, 'Open', CURRENT_TIMESTAMP)
-                                """),
-                                {"user_id": user['id'], "title": ticket_title, "desc": ticket_desc}
-                            )
-                            st.success(f"Ticket '{ticket_title}' submitted!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error while adding ticket: {str(e)}")
-                            import traceback
-                            st.exception(e)
-
-            st.write(t('all_tickets_lbl'))
-            try:
-                tickets_df = db.fetch_dataframe("SELECT t.id, t.title, t.description, t.status, t.created_at FROM support_tickets t ORDER BY t.created_at DESC")
-                if not tickets_df.empty:
-                    tickets_df = tickets_df.rename(columns={"title": "Title", "description": "Description", "status": "Status", "created_at": "Created"})
-                    st.dataframe(tickets_df[["id", "Title", "Description", "Status", "Created"]].set_index("id"), use_container_width=True)
-                else:
-                    st.info(t('no_tickets'))
-            except Exception as e:
-                st.error(f"Error loading tickets: {str(e)}")
-                import traceback
-                st.exception(e)
-
-        elif page_matches(selected_it_page, 'security_mgmt'):
-            st.subheader(f"4. {t('security_mgmt')}")
-            st.write(t('user_list'))
-            st.table([
-                {"Name": "Ali", "Role": "employee", "Status": "Active"},
-                {"Name": "Sara", "Role": "manager", "Status": "Inactive"}
-            ])
-            st.write(t('change_user_role'))
-
-        elif page_matches(selected_it_page, 'performance_monitor'):
-            st.subheader(f"5. {t('performance_monitor')}")
-            colp1, colp2, colp3 = st.columns(3)
-            with colp1:
-                st.metric(t('cpu_usage'), "23%", delta="+2%")
-            with colp2:
-                st.metric(t('mem_usage'), "1.2 GB", delta="-0.1 GB")
-            with colp3:
-                st.metric(t('active_users'), "8", delta="+1")
-
-        elif page_matches(selected_it_page, 'bug_tracking'):
-            st.subheader(f"6. {t('bug_tracking')}")
-            st.write(t('log_new_bug'))
-            with st.form("bug_form"):
-                bug_title = st.text_input(t('bug_title'))
-                bug_desc = st.text_area(t('bug_desc'))
-                submit_bug = st.form_submit_button(t('log_bug'))
-                if submit_bug:
-                    st.success(f"{t('bug_logged').replace('!', '')} '{bug_title}'!")
-            st.write(t('all_bugs'))
-            st.table([
-                {"Title": "Export Error", "Status": "Open"},
-                {"Title": "UI Crash", "Status": "Fixed"}
-            ])
-
-        elif page_matches(selected_it_page, 'activity_logs'):
-            st.subheader(f"7. {t('activity_logs')}")
-            st.write(t('recent_activities_lbl'))
-            st.table([
-                {"User": "Ali", "Action": "Login", "Timestamp": "2026-03-26 09:00"},
-                {"User": "Sara", "Action": "Data Export", "Timestamp": "2026-03-25 18:00"}
-            ])
 
 if page_matches(page, 'dashboard'):
     st.header(t('main_dashboard'))
@@ -4108,21 +4001,36 @@ elif page_matches(page, 'finance_dashboard'):
     st.caption(f"{t('last_updated')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
 
-    summary = db.get_finance_summary()
+    import time as _time_fin
+    _fin_now = _time_fin.time()
+    if (_fin_now - st.session_state.get("fin_dash_cache_time", 0)) > 30:
+        try: _fin_s = db.get_finance_summary()
+        except Exception: _fin_s = st.session_state.get("fin_dash_s", {"total_revenue":0,"total_expenses":0,"net_profit":0,"outstanding":0,"overdue":0})
+        try: _fin_rev, _fin_exp = db.get_monthly_financials()
+        except Exception: _fin_rev, _fin_exp = pd.DataFrame(), pd.DataFrame()
+        try: _fin_inv = db.get_invoices()
+        except Exception: _fin_inv = pd.DataFrame()
+        st.session_state.update({
+            "fin_dash_cache_time": _fin_now, "fin_dash_s": _fin_s,
+            "fin_dash_rev": _fin_rev, "fin_dash_exp": _fin_exp, "fin_dash_inv": _fin_inv,
+        })
+
+    summary = st.session_state.get("fin_dash_s", {"total_revenue":0,"total_expenses":0,"net_profit":0,"outstanding":0,"overdue":0})
+    rev_df  = st.session_state.get("fin_dash_rev", pd.DataFrame())
+    exp_df  = st.session_state.get("fin_dash_exp", pd.DataFrame())
+    inv_df  = st.session_state.get("fin_dash_inv", pd.DataFrame())
 
     k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric(t('total_revenue'),    f"${summary['total_revenue']:,.0f}")
-    k2.metric(t('total_expenses'),   f"${summary['total_expenses']:,.0f}")
-    k3.metric(t('net_profit'),       f"${summary['net_profit']:,.0f}",
-              delta=f"{(summary['net_profit']/summary['total_revenue']*100):.1f}% {t('margin_lbl')}" if summary['total_revenue'] else None)
-    k4.metric(t('outstanding'),      f"${summary['outstanding']:,.0f}")
-    k5.metric(t('overdue'),          f"${summary['overdue']:,.0f}",
-              delta_color="inverse" if summary['overdue'] > 0 else "normal",
-              delta=t('needs_action') if summary['overdue'] > 0 else None)
+    k1.metric(t('total_revenue'),    f"${summary.get('total_revenue',0):,.0f}")
+    k2.metric(t('total_expenses'),   f"${summary.get('total_expenses',0):,.0f}")
+    k3.metric(t('net_profit'),       f"${summary.get('net_profit',0):,.0f}",
+              delta=f"{(summary['net_profit']/summary['total_revenue']*100):.1f}% {t('margin_lbl')}" if summary.get('total_revenue') else None)
+    k4.metric(t('outstanding'),      f"${summary.get('outstanding',0):,.0f}")
+    k5.metric(t('overdue'),          f"${summary.get('overdue',0):,.0f}",
+              delta_color="inverse" if summary.get('overdue',0) > 0 else "normal",
+              delta=t('needs_action') if summary.get('overdue',0) > 0 else None)
 
     st.markdown("---")
-    rev_df, exp_df = db.get_monthly_financials()
-
     col_l, col_r = st.columns(2)
     with col_l:
         if not rev_df.empty or not exp_df.empty:
@@ -4138,7 +4046,6 @@ elif page_matches(page, 'finance_dashboard'):
             st.info(t('no_financial_data_short'))
 
     with col_r:
-        inv_df = db.get_invoices()
         if not inv_df.empty:
             status_counts = inv_df["status"].value_counts().reset_index()
             status_counts.columns = [t('status'), "Count"]
@@ -4153,7 +4060,6 @@ elif page_matches(page, 'finance_dashboard'):
 
     st.markdown("---")
     st.subheader(t('recent_invoices'))
-    inv_df = db.get_invoices()
     if not inv_df.empty:
         disp = inv_df[["invoice_number","client_name","shipment_ref","total","status","due_date"]].head(8)
         disp.columns = [t('col_invoice'), t('col_client'), t('shipment_ref'), t('col_total_usd'), t('status'), t('col_due_date')]
@@ -4552,33 +4458,34 @@ elif page_matches(page, 'marketing_dashboard'):
     st.caption(f"{t('last_updated')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
 
-    try:
-        campaigns_df = db.fetch_dataframe("SELECT * FROM marketing_campaigns")
-        total_campaigns  = len(campaigns_df)
-        active_campaigns = len(campaigns_df[campaigns_df["status"] == "Active"]) if not campaigns_df.empty else 0
-        total_budget     = campaigns_df["budget"].sum() if not campaigns_df.empty else 0
-        total_spent      = campaigns_df["spent"].sum()  if not campaigns_df.empty else 0
-    except Exception:
-        total_campaigns = active_campaigns = total_budget = total_spent = 0
-        campaigns_df = pd.DataFrame()
+    import time as _time_mkt
+    _mkt_now = _time_mkt.time()
+    if (_mkt_now - st.session_state.get("mkt_dash_cache_time", 0)) > 30:
+        try: _mkt_camp = db.fetch_dataframe("SELECT * FROM marketing_campaigns")
+        except Exception: _mkt_camp = pd.DataFrame()
+        try: _mkt_met = db.fetch_dataframe("SELECT * FROM marketing_campaign_metrics")
+        except Exception: _mkt_met = pd.DataFrame()
+        try: _mkt_posts = db.fetch_dataframe("SELECT * FROM marketing_social_posts")
+        except Exception: _mkt_posts = pd.DataFrame()
+        st.session_state.update({
+            "mkt_dash_cache_time": _mkt_now,
+            "mkt_dash_camp": _mkt_camp, "mkt_dash_met": _mkt_met, "mkt_dash_posts": _mkt_posts,
+        })
 
-    try:
-        metrics_df = db.fetch_dataframe("SELECT * FROM marketing_campaign_metrics")
-        total_impressions  = int(metrics_df["impressions"].sum())  if not metrics_df.empty else 0
-        total_clicks       = int(metrics_df["clicks"].sum())       if not metrics_df.empty else 0
-        total_conversions  = int(metrics_df["conversions"].sum())  if not metrics_df.empty else 0
-        total_revenue      = metrics_df["revenue"].sum()           if not metrics_df.empty else 0
-    except Exception:
-        total_impressions = total_clicks = total_conversions = total_revenue = 0
-        metrics_df = pd.DataFrame()
+    campaigns_df = st.session_state.get("mkt_dash_camp", pd.DataFrame())
+    metrics_df   = st.session_state.get("mkt_dash_met", pd.DataFrame())
+    posts_df     = st.session_state.get("mkt_dash_posts", pd.DataFrame())
 
-    try:
-        posts_df = db.fetch_dataframe("SELECT * FROM marketing_social_posts")
-        total_posts       = len(posts_df)
-        scheduled_posts   = len(posts_df[posts_df["status"] == "Scheduled"]) if not posts_df.empty else 0
-    except Exception:
-        total_posts = scheduled_posts = 0
-        posts_df = pd.DataFrame()
+    total_campaigns  = len(campaigns_df)
+    active_campaigns = len(campaigns_df[campaigns_df["status"] == "Active"]) if not campaigns_df.empty else 0
+    total_budget     = campaigns_df["budget"].sum() if not campaigns_df.empty else 0
+    total_spent      = campaigns_df["spent"].sum()  if not campaigns_df.empty else 0
+    total_impressions  = int(metrics_df["impressions"].sum())  if not metrics_df.empty else 0
+    total_clicks       = int(metrics_df["clicks"].sum())       if not metrics_df.empty else 0
+    total_conversions  = int(metrics_df["conversions"].sum())  if not metrics_df.empty else 0
+    total_revenue      = metrics_df["revenue"].sum()           if not metrics_df.empty else 0
+    total_posts        = len(posts_df)
+    scheduled_posts    = len(posts_df[posts_df["status"] == "Scheduled"]) if not posts_df.empty else 0
 
     # KPI Cards
     c1, c2, c3, c4 = st.columns(4)
@@ -4979,28 +4886,28 @@ elif page_matches(page, 'it_dashboard'):
         psutil = None
 
     cpu_val = ram_val = disk_val = resp_val = 0
+    _now = _time.time()
+    _cache_stale = (_now - st.session_state.get("it_dash_cache_time", 0)) > 30
 
     if psutil is None:
         st.warning(t('psutil_missing'))
-        server_stats = []
-        logs = []
     else:
-        # قراءة مباشرة من psutil للقيم الحالية
-        cpu_val  = psutil.cpu_percent(interval=0.5)
+        # Non-blocking CPU read — interval=0 uses psutil's cached value (no 500ms wait)
+        cpu_val  = psutil.cpu_percent(interval=0)
         ram_val  = psutil.virtual_memory().percent
         disk_val = psutil.disk_usage("/").percent
+        resp_val = st.session_state.get("it_resp_val", 0)
 
-        # قياس زمن استجابة قاعدة البيانات
-        t0 = _time.time()
-        try:
-            with db.get_connection():
+        # Snapshot + response-time measurement throttled to every 30 seconds
+        if "it_last_snapshot" not in st.session_state or (_now - st.session_state.get("it_last_snapshot", 0)) > 30:
+            t0 = _time.time()
+            try:
+                with db.get_connection():
+                    pass
+            except Exception:
                 pass
-        except Exception:
-            pass
-        resp_val = round((_time.time() - t0) * 1000, 1)
-
-        # حفظ snapshot في MySQL — فوراً في أول زيارة، ثم كل 30 ثانية
-        if "it_last_snapshot" not in st.session_state or (_time.time() - st.session_state.get("it_last_snapshot", 0)) > 30:
+            resp_val = round((_time.time() - t0) * 1000, 1)
+            st.session_state["it_resp_val"] = resp_val
             nio = psutil.net_io_counters()
             db.insert_performance_snapshot(cpu_val, ram_val, disk_val,
                                            round(nio.bytes_sent/1024/1024, 2),
@@ -5011,32 +4918,55 @@ elif page_matches(page, 'it_dashboard'):
                 ip = socket.gethostbyname(hostname)
             except Exception:
                 ip = "127.0.0.1"
-            uptime_seconds = int(_time.time() - psutil.boot_time())
+            uptime_seconds = int(_now - psutil.boot_time())
             status = "Online" if cpu_val < 90 and ram_val < 90 else "Degraded"
             db.insert_server_snapshot(hostname, status, cpu_val, ram_val, disk_val, uptime_seconds, ip)
-            st.session_state["it_last_snapshot"] = _time.time()
+            st.session_state["it_last_snapshot"] = _now
 
-        server_stats = db.get_latest_server_status()
-        logs         = db.get_recent_activity_log(8)
+    # Cache all DB reads — refresh only when stale (>30 s)
+    if _cache_stale:
+        try:
+            _sv = db.get_latest_server_status()
+        except Exception:
+            _sv = st.session_state.get("it_dash_server_stats", [])
+        try:
+            _lg = db.get_recent_activity_log(8)
+        except Exception:
+            _lg = st.session_state.get("it_dash_logs", [])
+        try:
+            _sc = int(db.fetch_dataframe(
+                "SELECT COUNT(*) as cnt FROM it_security_events WHERE event_type='failed_login' AND timestamp >= NOW() - INTERVAL 7 DAY"
+            ).iloc[0]["cnt"])
+        except Exception:
+            _sc = st.session_state.get("it_dash_suspicious", 0)
+        try:
+            users_df = db.fetch_dataframe("SELECT id, created_at FROM users")
+            _nu = len(users_df)
+            _nn = int((users_df["created_at"] >= (pd.Timestamp.now() - pd.Timedelta(days=30))).sum()) if "created_at" in users_df.columns else 0
+        except Exception:
+            _nu = st.session_state.get("it_dash_num_users", 0)
+            _nn = st.session_state.get("it_dash_num_new_users", 0)
+        try:
+            _ot = int(db.fetch_dataframe("SELECT COUNT(*) as cnt FROM support_tickets WHERE status != 'Closed'").iloc[0]["cnt"])
+        except Exception:
+            _ot = st.session_state.get("it_dash_open_tickets", 0)
+        try:
+            _ph = db.get_performance_history(20)
+        except Exception:
+            _ph = st.session_state.get("it_dash_perf_history", [])
+        st.session_state.update({
+            "it_dash_cache_time": _now, "it_dash_server_stats": _sv, "it_dash_logs": _lg,
+            "it_dash_suspicious": _sc, "it_dash_num_users": _nu, "it_dash_num_new_users": _nn,
+            "it_dash_open_tickets": _ot, "it_dash_perf_history": _ph,
+        })
 
-    try:
-        suspicious_count = int(db.fetch_dataframe(
-            "SELECT COUNT(*) as cnt FROM it_security_events WHERE event_type='failed_login' AND timestamp >= NOW() - INTERVAL 7 DAY"
-        ).iloc[0]["cnt"])
-    except Exception:
-        suspicious_count = 0
-
-    try:
-        users_df      = db.fetch_dataframe("SELECT id, created_at FROM users")
-        num_users     = len(users_df)
-        num_new_users = int((users_df["created_at"] >= (pd.Timestamp.now() - pd.Timedelta(days=30))).sum()) if "created_at" in users_df.columns else 0
-    except Exception:
-        num_users, num_new_users = 0, 0
-
-    try:
-        open_tickets = int(db.fetch_dataframe("SELECT COUNT(*) as cnt FROM support_tickets WHERE status != 'Closed'").iloc[0]["cnt"])
-    except Exception:
-        open_tickets = 0
+    server_stats     = st.session_state.get("it_dash_server_stats", [])
+    logs             = st.session_state.get("it_dash_logs", [])
+    suspicious_count = st.session_state.get("it_dash_suspicious", 0)
+    num_users        = st.session_state.get("it_dash_num_users", 0)
+    num_new_users    = st.session_state.get("it_dash_num_new_users", 0)
+    open_tickets     = st.session_state.get("it_dash_open_tickets", 0)
+    perf_history     = st.session_state.get("it_dash_perf_history", [])
 
     st.header("💻 " + t('it_dashboard'))
     st.caption(f"{t('last_updated')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -5049,7 +4979,6 @@ elif page_matches(page, 'it_dashboard'):
     c4.metric(t('open_tickets'),     open_tickets)
 
     st.markdown("---")
-    perf_history = db.get_performance_history(20)
     col_left, col_right = st.columns(2)
 
     with col_left:
@@ -5124,7 +5053,7 @@ elif page_matches(page, 'system_management'):
         st.error(t('no_psutil'))
         st.stop()
 
-    cpu_live  = psutil.cpu_percent(interval=0.5)
+    cpu_live  = psutil.cpu_percent(interval=0)
     ram_live  = psutil.virtual_memory()
     disk_live = psutil.disk_usage("/")
     net_live  = psutil.net_io_counters()
@@ -5138,7 +5067,16 @@ elif page_matches(page, 'system_management'):
               f"{disk_live.used // (1024**3):.1f} GB / {disk_live.total // (1024**3):.1f} GB")
 
     st.markdown("---")
-    perf_history = db.get_performance_history(30)
+    import time as _time_sm
+    _sm_now = _time_sm.time()
+    if (_sm_now - st.session_state.get("sm_perf_cache_time", 0)) > 30:
+        try:
+            _sm_ph = db.get_performance_history(30)
+        except Exception:
+            _sm_ph = st.session_state.get("sm_perf_history", [])
+        st.session_state["sm_perf_history"] = _sm_ph
+        st.session_state["sm_perf_cache_time"] = _sm_now
+    perf_history = st.session_state.get("sm_perf_history", [])
     if perf_history:
         st.subheader(t('perf_history'))
         ph_df = pd.DataFrame(perf_history)
@@ -5150,7 +5088,14 @@ elif page_matches(page, 'system_management'):
         st.plotly_chart(fig_area, use_container_width=True)
 
     st.markdown("---")
-    server_stats = db.get_latest_server_status()
+    if (_sm_now - st.session_state.get("sm_srv_cache_time", 0)) > 30:
+        try:
+            _sm_sv = db.get_latest_server_status()
+        except Exception:
+            _sm_sv = st.session_state.get("sm_server_stats", [])
+        st.session_state["sm_server_stats"] = _sm_sv
+        st.session_state["sm_srv_cache_time"] = _sm_now
+    server_stats = st.session_state.get("sm_server_stats", [])
     st.subheader(t('server_status'))
     if server_stats:
         srv_df = pd.DataFrame(server_stats)
@@ -5291,22 +5236,37 @@ elif page_matches(page, 'logistics_dashboard'):
     st.caption(f"{t('last_updated')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
 
-    summary = db.get_logistics_summary()
+    import time as _time_log
+    _log_now = _time_log.time()
+    if (_log_now - st.session_state.get("log_dash_cache_time", 0)) > 30:
+        try: _log_s = db.get_logistics_summary()
+        except Exception: _log_s = st.session_state.get("log_dash_s", {"total":0,"in_transit":0,"delivered_this_month":0,"pending":0,"overdue":0})
+        try: _log_all = db.get_shipments_logistics()
+        except Exception: _log_all = pd.DataFrame()
+        try: _log_vol = db.get_monthly_shipment_volume()
+        except Exception: _log_vol = pd.DataFrame()
+        st.session_state.update({
+            "log_dash_cache_time": _log_now, "log_dash_s": _log_s,
+            "log_dash_all": _log_all, "log_dash_vol": _log_vol,
+        })
+
+    summary = st.session_state.get("log_dash_s", {"total":0,"in_transit":0,"delivered_this_month":0,"pending":0,"overdue":0})
+    df_all  = st.session_state.get("log_dash_all", pd.DataFrame())
+    vol_df  = st.session_state.get("log_dash_vol", pd.DataFrame())
 
     k1,k2,k3,k4,k5 = st.columns(5)
-    k1.metric(t('total_shipments'),   summary["total"])
-    k2.metric(t('in_transit'),        summary["in_transit"])
-    k3.metric(t('delivered_month'), summary["delivered_this_month"])
-    k4.metric(t('pending_customs'), summary["pending"])
-    k5.metric(t('overdue'),           summary["overdue"],
-              delta=t('needs_action') if summary["overdue"] > 0 else None,
-              delta_color="inverse" if summary["overdue"] > 0 else "normal")
+    k1.metric(t('total_shipments'),   summary.get("total",0))
+    k2.metric(t('in_transit'),        summary.get("in_transit",0))
+    k3.metric(t('delivered_month'),   summary.get("delivered_this_month",0))
+    k4.metric(t('pending_customs'),   summary.get("pending",0))
+    k5.metric(t('overdue'),           summary.get("overdue",0),
+              delta=t('needs_action') if summary.get("overdue",0) > 0 else None,
+              delta_color="inverse" if summary.get("overdue",0) > 0 else "normal")
 
     st.markdown("---")
     col_l, col_r = st.columns(2)
 
     with col_l:
-        df_all = db.get_shipments_logistics()
         if not df_all.empty:
             sc = df_all["status"].value_counts().reset_index()
             sc.columns = [t('status'), t('count_lbl')]
@@ -5318,7 +5278,6 @@ elif page_matches(page, 'logistics_dashboard'):
             st.plotly_chart(fig_s, use_container_width=True)
 
     with col_r:
-        vol_df = db.get_monthly_shipment_volume()
         if not vol_df.empty:
             fig_v = px.bar(vol_df, x="month", y="count", color="type",
                            labels={"count": t('shipments_lbl'), "month": t('month_lbl'), "type": t('type')},
@@ -5329,7 +5288,6 @@ elif page_matches(page, 'logistics_dashboard'):
 
     st.markdown("---")
     st.subheader(t('recent_shipments'))
-    df_all = db.get_shipments_logistics()
     if not df_all.empty:
         disp_cols = ["shipment_number","shipment_type","freight_mode","origin","destination",
                      "carrier_name","status","departure_date","expected_arrival"]
@@ -5696,22 +5654,33 @@ elif page_matches(page, 'customer_service_dashboard'):
     st.caption(f"{t('last_updated')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
 
-    summary = db.get_cs_summary()
+    import time as _time_cs
+    _cs_now = _time_cs.time()
+    if (_cs_now - st.session_state.get("cs_dash_cache_time", 0)) > 30:
+        try: _cs_s = db.get_cs_summary()
+        except Exception: _cs_s = st.session_state.get("cs_dash_s", {"total":0,"open_count":0,"in_progress":0,"resolved_today":0,"avg_rating":0.0,"unread_feedback":0})
+        try: _cs_tkt = db.get_cs_tickets()
+        except Exception: _cs_tkt = pd.DataFrame()
+        st.session_state.update({
+            "cs_dash_cache_time": _cs_now, "cs_dash_s": _cs_s, "cs_dash_tkt": _cs_tkt,
+        })
+
+    summary   = st.session_state.get("cs_dash_s", {"total":0,"open_count":0,"in_progress":0,"resolved_today":0,"avg_rating":0.0,"unread_feedback":0})
+    tkt_df    = st.session_state.get("cs_dash_tkt", pd.DataFrame())
 
     k1,k2,k3,k4,k5 = st.columns(5)
-    k1.metric(t('total_tickets'),    summary["total"])
-    k2.metric(t('open_status'),      summary["open_count"],
-              delta=t('needs_attention') if summary["open_count"] > 0 else None,
-              delta_color="inverse" if summary["open_count"] > 0 else "normal")
-    k3.metric(t('in_progress'),      summary["in_progress"])
-    k4.metric(t('resolved_today'),   summary["resolved_today"])
-    k5.metric(t('avg_rating'),       f"⭐ {summary['avg_rating']:.1f} / 5.0")
+    k1.metric(t('total_tickets'),    summary.get("total",0))
+    k2.metric(t('open_status'),      summary.get("open_count",0),
+              delta=t('needs_attention') if summary.get("open_count",0) > 0 else None,
+              delta_color="inverse" if summary.get("open_count",0) > 0 else "normal")
+    k3.metric(t('in_progress'),      summary.get("in_progress",0))
+    k4.metric(t('resolved_today'),   summary.get("resolved_today",0))
+    k5.metric(t('avg_rating'),       f"⭐ {summary.get('avg_rating',0.0):.1f} / 5.0")
 
     st.markdown("---")
     col_l, col_r = st.columns(2)
 
     with col_l:
-        tkt_df = db.get_cs_tickets()
         if not tkt_df.empty:
             sc = tkt_df["status"].value_counts().reset_index()
             sc.columns = [t('status'), "Count"]
@@ -5722,9 +5691,8 @@ elif page_matches(page, 'customer_service_dashboard'):
             st.plotly_chart(fig_s, use_container_width=True)
 
     with col_r:
-        tkt_df2 = db.get_cs_tickets()
-        if not tkt_df2.empty:
-            cat_c = tkt_df2["category"].value_counts().reset_index()
+        if not tkt_df.empty:
+            cat_c = tkt_df["category"].value_counts().reset_index()
             cat_c.columns = [t('category_label'), "Count"]
             fig_c = px.bar(cat_c, x="Count", y=t('category_label'), orientation="h",
                            color_discrete_sequence=["#3b82f6"],
@@ -5734,9 +5702,8 @@ elif page_matches(page, 'customer_service_dashboard'):
 
     st.markdown("---")
     st.subheader(t('open_urgent_tickets'))
-    urgent_df = db.get_cs_tickets(status_filter=None)
-    if not urgent_df.empty:
-        urgent_df = urgent_df[urgent_df["status"].isin(["Open","In Progress"])]
+    if not tkt_df.empty:
+        urgent_df = tkt_df[tkt_df["status"].isin(["Open","In Progress"])]
         if not urgent_df.empty:
             PRIORITY_ICON = {"Urgent":"🔴","High":"🟠","Medium":"🟡","Low":"🟢"}
             for _, row in urgent_df.head(5).iterrows():
@@ -5745,7 +5712,7 @@ elif page_matches(page, 'customer_service_dashboard'):
         else:
             st.success(t('no_open_tickets'))
 
-    if summary["unread_feedback"] > 0:
+    if summary.get("unread_feedback",0) > 0:
         st.info(f"📬 {t('unread_feedback_msg').format(n=summary['unread_feedback'])}")
 
 elif page_matches(page, 'client_tickets'):
@@ -5946,22 +5913,41 @@ elif page_matches(page, 'administration_dashboard'):
     st.caption(f"{t('last_updated')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
 
-    s = db.get_admin_summary()
+    import time as _time_adm
+    _adm_now = _time_adm.time()
+    if (_adm_now - st.session_state.get("adm_dash_cache_time", 0)) > 30:
+        try: _adm_s = db.get_admin_summary()
+        except Exception: _adm_s = st.session_state.get("adm_dash_s", {"active_docs":0,"total_docs":0,"active_contracts":0,"upcoming_meetings":0,"expiring_soon":0,"total_contracts":0})
+        try: _adm_mtg = db.get_admin_meetings(upcoming_only=True)
+        except Exception: _adm_mtg = pd.DataFrame()
+        try: _adm_contr = db.get_admin_contracts(status="Active")
+        except Exception: _adm_contr = pd.DataFrame()
+        try: _adm_docs = db.get_admin_documents()
+        except Exception: _adm_docs = pd.DataFrame()
+        st.session_state.update({
+            "adm_dash_cache_time": _adm_now, "adm_dash_s": _adm_s,
+            "adm_dash_mtg": _adm_mtg, "adm_dash_contr": _adm_contr, "adm_dash_docs": _adm_docs,
+        })
+
+    s        = st.session_state.get("adm_dash_s", {"active_docs":0,"total_docs":0,"active_contracts":0,"upcoming_meetings":0,"expiring_soon":0,"total_contracts":0})
+    mtg_df   = st.session_state.get("adm_dash_mtg", pd.DataFrame())
+    contr_df = st.session_state.get("adm_dash_contr", pd.DataFrame())
+    doc_df   = st.session_state.get("adm_dash_docs", pd.DataFrame())
+
     k1,k2,k3,k4,k5 = st.columns(5)
-    k1.metric(t('total_documents'),    s["active_docs"],    delta=f"{s['total_docs']} {t('total_word')}")
-    k2.metric(t('active_contracts'),   s["active_contracts"])
-    k3.metric(t('upcoming_meetings'),  s["upcoming_meetings"])
-    k4.metric(t('expiring_30d'),       s["expiring_soon"],
-              delta="Renew soon" if s["expiring_soon"] > 0 else None,
-              delta_color="inverse" if s["expiring_soon"] > 0 else "normal")
-    k5.metric(t('total_contracts_lbl'), s["total_contracts"])
+    k1.metric(t('total_documents'),    s.get("active_docs",0),    delta=f"{s.get('total_docs',0)} {t('total_word')}")
+    k2.metric(t('active_contracts'),   s.get("active_contracts",0))
+    k3.metric(t('upcoming_meetings'),  s.get("upcoming_meetings",0))
+    k4.metric(t('expiring_30d'),       s.get("expiring_soon",0),
+              delta="Renew soon" if s.get("expiring_soon",0) > 0 else None,
+              delta_color="inverse" if s.get("expiring_soon",0) > 0 else "normal")
+    k5.metric(t('total_contracts_lbl'), s.get("total_contracts",0))
 
     st.markdown("---")
     col_l, col_r = st.columns(2)
 
     with col_l:
         st.subheader(t('upcoming_meetings_hdr'))
-        mtg_df = db.get_admin_meetings(upcoming_only=True)
         if not mtg_df.empty:
             TYPE_ICON = {"Internal":"🏢","With Carrier":"🚢","With Client":"🤝",
                          "With Customs":"🛂","Regulatory":"📋","Board":"👔"}
@@ -5974,7 +5960,6 @@ elif page_matches(page, 'administration_dashboard'):
 
     with col_r:
         st.subheader(t('contracts_expiring'))
-        contr_df = db.get_admin_contracts(status="Active")
         if not contr_df.empty:
             contr_df["end_date"] = pd.to_datetime(contr_df["end_date"])
             soon = contr_df[contr_df["end_date"] <= pd.Timestamp.now() + pd.Timedelta(days=90)].sort_values("end_date")
@@ -5985,10 +5970,11 @@ elif page_matches(page, 'administration_dashboard'):
                     st.markdown(f"{color} **{row['title']}** — expires **{str(row['end_date'])[:10]}** ({days_left}d)")
             else:
                 st.success(t('no_contracts_expiring'))
+        else:
+            st.info(t('no_contracts_expiring'))
 
     st.markdown("---")
     st.subheader(t('recent_docs'))
-    doc_df = db.get_admin_documents()
     if not doc_df.empty:
         disp = doc_df[["title","category","status","expiry_date"]].head(6).copy()
         disp.columns = ["Title","Category","Status","Expiry"]
@@ -6215,19 +6201,37 @@ elif page_matches(page, 'sales_dashboard'):
     st.header(t('sales_dashboard'))
     st.caption(f"{t('last_updated')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
-    s = db.get_sales_summary()
+
+    import time as _time_sal
+    _sal_now = _time_sal.time()
+    if (_sal_now - st.session_state.get("sal_dash_cache_time", 0)) > 30:
+        try: _sal_s = db.get_sales_summary()
+        except Exception: _sal_s = st.session_state.get("sal_dash_s", {"total_leads":0,"active_leads":0,"total_deals":0,"won_deals":0,"pipeline_value":0,"win_rate":0})
+        try: _sal_leads = db.get_sales_leads()
+        except Exception: _sal_leads = pd.DataFrame()
+        try: _sal_deals = db.get_sales_deals()
+        except Exception: _sal_deals = pd.DataFrame()
+        st.session_state.update({
+            "sal_dash_cache_time": _sal_now, "sal_dash_s": _sal_s,
+            "sal_dash_leads": _sal_leads, "sal_dash_deals": _sal_deals,
+        })
+
+    s             = st.session_state.get("sal_dash_s", {"total_leads":0,"active_leads":0,"total_deals":0,"won_deals":0,"pipeline_value":0,"win_rate":0})
+    leads_df_dash = st.session_state.get("sal_dash_leads", pd.DataFrame())
+    deals_df_dash = st.session_state.get("sal_dash_deals", pd.DataFrame())
+
     sc1,sc2,sc3,sc4,sc5,sc6 = st.columns(6)
-    sc1.metric(t('total_leads'),    s["total_leads"])
-    sc2.metric(t('active_leads'),   s["active_leads"])
-    sc3.metric(t('open_deals'),     s["total_deals"] - s["won_deals"])
-    sc4.metric(t('pipeline_value'), f"${s['pipeline_value']:,.0f}")
-    sc5.metric(t('won_deals'),      s["won_deals"])
-    sc6.metric(t('win_rate'),       f"{s['win_rate']}%")
+    sc1.metric(t('total_leads'),    s.get("total_leads",0))
+    sc2.metric(t('active_leads'),   s.get("active_leads",0))
+    sc3.metric(t('open_deals'),     s.get("total_deals",0) - s.get("won_deals",0))
+    sc4.metric(t('pipeline_value'), f"${s.get('pipeline_value',0):,.0f}")
+    sc5.metric(t('won_deals'),      s.get("won_deals",0))
+    sc6.metric(t('win_rate'),       f"{s.get('win_rate',0)}%")
     st.markdown("---")
 
     try:
-        leads_df_dash = db.get_sales_leads()
-        deals_df_dash = db.get_sales_deals()
+        leads_df_dash = leads_df_dash if leads_df_dash is not None else pd.DataFrame()
+        deals_df_dash = deals_df_dash if deals_df_dash is not None else pd.DataFrame()
 
         col_l, col_r = st.columns(2)
         with col_l:

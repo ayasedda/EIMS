@@ -3,6 +3,7 @@ from sqlalchemy import create_engine, text
 import streamlit as st
 import os
 import logging
+import threading
 
 logger = logging.getLogger("eims_db")
 logger.setLevel(logging.WARNING)
@@ -794,39 +795,48 @@ class Database:
             st.error(f"Configured DATABASE_URL does not appear to be MySQL: {self.db_url}\nPlease use a MySQL URL like: mysql+pymysql://root:12345678aA.@host:3307/eims")
             st.stop()
         if Database._engine is None:
+            import sys as _sys
+            _connect_args = {
+                "connect_timeout": 20,
+                "read_timeout": 30,
+                "write_timeout": 30,
+            }
+            if getattr(_sys, 'frozen', False):
+                _connect_args["ssl"] = {"check_hostname": False, "verify_mode": False}
             Database._engine = create_engine(
                 self.db_url,
-                pool_size=20,
-                max_overflow=40,
-                pool_pre_ping=True,
-                pool_recycle=1800,
-                pool_timeout=10,
-                echo=False
+                pool_size=1,
+                max_overflow=2,
+                pool_pre_ping=False,
+                pool_recycle=3600,
+                pool_timeout=15,
+                echo=False,
+                connect_args=_connect_args,
             )
-        # Ensure essential tables exist and schemas are up-to-date on construction
-        try:
-            # call init functions; they are idempotent
-            self.init_users_table()
-            self.init_leave_table()
-            self.init_shipments_table()
-            self.init_cargo_items_table()
-            self.init_tracking_updates_table()
-            self.init_documents_table()
-            self.init_cargo_requests_table()
-            self.init_messages_table()
-            self.init_support_tickets_table()
-            self.init_it_security_events_table()
-            self.init_it_performance_monitoring_table()
-            self.init_it_servers_status_table()
-            self.init_it_activity_log_table()
-            self.init_logistics_tables()
-            self.init_finance_tables()
-            self.init_cs_tables()
-            self.init_admin_tables()
-            self.init_sales_tables()
-        except Exception:
-            # log but don't prevent app startup
-            logger.exception("Error ensuring DB schema on init")
+        # Run table init in background so first page load is not blocked
+        def _bg_init():
+            try:
+                self.init_users_table()
+                self.init_leave_table()
+                self.init_shipments_table()
+                self.init_cargo_items_table()
+                self.init_tracking_updates_table()
+                self.init_documents_table()
+                self.init_cargo_requests_table()
+                self.init_messages_table()
+                self.init_support_tickets_table()
+                self.init_it_security_events_table()
+                self.init_it_performance_monitoring_table()
+                self.init_it_servers_status_table()
+                self.init_it_activity_log_table()
+                self.init_logistics_tables()
+                self.init_finance_tables()
+                self.init_cs_tables()
+                self.init_admin_tables()
+                self.init_sales_tables()
+            except Exception:
+                logger.exception("Error ensuring DB schema on init")
+        threading.Thread(target=_bg_init, daemon=True).start()
         # Log that Database shim was initialized (helps confirm reloads)
         try:
             logger.info("Database shim initialized from database_mysql.py")
